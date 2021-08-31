@@ -6,9 +6,13 @@
     # nixops.url  = "github:lukebfox/nixops-plugged";
     nixops.url = "github:NixOS/nixops";
     utils.url = "github:numtide/flake-utils";
+    flake-compat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, nixops, utils, ... }:
+  outputs = { self, nixpkgs, nixops, utils, flake-compat, ... }:
     let
       domain = "playnft.hhefesto.com";
       pkgsFor = system: import nixpkgs {
