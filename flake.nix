@@ -22,7 +22,8 @@
 
     in {
       overlay = final: prev: {
-        muellshack = prev.callPackage ./muellshack {};
+        # muellshack = prev.callPackage ./muellshack {};
+        react_frontend = prev.callPackage ./react {};
       };
 
       nixopsConfigurations.default = {
@@ -38,7 +39,7 @@
     } // utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let pkgs = pkgsFor system;
       in {
-        defaultPackage = pkgs.muellshack;
+        defaultPackage = pkgs.react_frontend;
 
         devShell = pkgs.mkShell {
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
