@@ -22,8 +22,8 @@
 
     in {
       overlay = final: prev: {
-        # muellshack = prev.callPackage ./muellshack {};
         react_frontend = prev.callPackage ./react {};
+	eth_contracts = prev.callPackage ./eth {};
       };
 
       nixopsConfigurations.default = {
@@ -39,7 +39,7 @@
     } // utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let pkgs = pkgsFor system;
       in {
-        defaultPackage = pkgs.react_frontend;
+        defaultPackage = pkgs.eth_contracts;
 
         devShell = pkgs.mkShell {
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
