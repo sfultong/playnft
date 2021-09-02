@@ -1,6 +1,7 @@
 eth/build/
 eth/node_modules/
 eth/yarn.lock
+eth/.env
 react/node_modules/
 react/yarn.lock
 
