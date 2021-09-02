@@ -1,5 +1,6 @@
 {
   description = "playNFT flake";
+  nixConfig.bash-prompt-suffix = "\\033[1;33m(playNFT)\\033[0m ";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
