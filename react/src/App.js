@@ -116,10 +116,10 @@ class ImageUpload extends React.Component {
 
             axios.post("http://localhost:8081/upload-image", formData)
                 .then ((res) => {
-                    if (res.status) {
-                        alert (res.message);
+                    if (res.data.status) {
+                        alert (res.data.message);
                     } else {
-                        alert (res.message);
+                        alert (res.data);
                     }
                 }).catch ((err) => {
                     alert ("error uploading file: " + err);
