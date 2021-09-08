@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from 'axios';
 import { site } from "./abi/abi";
 import Web3 from "web3";
 import logo from './logo.svg';
@@ -18,8 +19,6 @@ const activeMetamask = 2;
 var provider;
 
 class MetaMaskButton extends React.Component {
-
-
     constructor(props) {
         super(props);
 
@@ -80,7 +79,6 @@ class MetaMaskButton extends React.Component {
             : "This message should be hidden";
     }
 
-
     render () {
         if (this.state.value === activeMetamask) {
             return (<div></div>);
@@ -89,6 +87,55 @@ class MetaMaskButton extends React.Component {
                 <button className="button" onClick={this.handleClick}>
                 {this.getDisplay()}
                 </button>
+        );
+    }
+}
+
+class ImageUpload extends React.Component {
+    constructor(props) {
+        super(props);
+
+        this.changeHandler = this.changeHandler.bind(this);
+        this.handleSubmit = this.handleSubmit.bind(this);
+
+        this.state = {
+        };
+
+    }
+
+    changeHandler (event) {
+        this.setState({file: event.target.files[0]});
+    };
+
+    handleSubmit () {
+        if (! this.state.file) {
+            alert ("no file");
+        } else {
+            const formData = new FormData();
+            formData.append("image", this.state.file);
+
+            axios.post("http://localhost:8081/upload-image", formData)
+                .then ((res) => {
+                    if (res.status) {
+                        alert (res.message);
+                    } else {
+                        alert (res.message);
+                    }
+                }).catch ((err) => {
+                    alert ("error uploading file: " + err);
+                });
+        }
+    }
+
+    render () {
+        return (
+        <div className="imageUploadForm">
+            <form action="http://localhost:8081/upload-image" method="post" enctype="multipart/form-data">
+            <label for="file">Filename:</label>
+                <input type="file" name="image" id="image-upload" onChange={this.changeHandler} />
+            <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
+            </form>
+        </div>
         );
     }
 }
@@ -110,6 +157,10 @@ function App() {
 
     return (
         <div className="main">
+            <div>
+            <img src="http://localhost:8081/caring_sam.jpg"/>
+            </div>
+            <ImageUpload />
             <div className="card">
                 <MetaMaskButton />
                 <div>{getAddr}</div>
