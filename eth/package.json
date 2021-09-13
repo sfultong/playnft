@@ -4,12 +4,19 @@
   "private": true,
   "dependencies": {
     "@truffle/hdwallet-provider": "^1.5.0",
+    "body-parser": "^1.19.0",
     "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "express-fileupload": "^1.2.1",
     "ganache-cli": "^6.12.2",
-    "truffle": "^5.4.8"
+    "truffle": "^5.4.8",
+    "web3": "^1.5.2"
   },
   "scripts": {
     "startg": "ganache-cli",
-    "build": "truffle compile"
+    "build": "truffle compile",
+    "console": "truffle console",
+    "migrate": "truffle migrate",
+    "startb": "node backend/server.js"
   }
 }

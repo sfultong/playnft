@@ -9,7 +9,8 @@ import detectEthereumProvider from '@metamask/detect-provider';
 
 const web3 = new Web3(Web3.givenProvider);
 
-const contractAddress = "0xd452Beeb06f70F6112Bd75f3D15f96c7104e3A55";
+const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+const apiHost = process.env.REACT_APP_API_HOST;
 const siteContract = new web3.eth.Contract(site, contractAddress);
 
 const installMetamask = 0;
@@ -114,7 +115,7 @@ class ImageUpload extends React.Component {
             const formData = new FormData();
             formData.append("image", this.state.file);
 
-            axios.post("http://localhost:8081/upload-image", formData)
+            axios.post(apiHost + "/upload-image", formData)
                 .then ((res) => {
                     if (res.data.status) {
                         alert (res.data.message);
@@ -130,7 +131,7 @@ class ImageUpload extends React.Component {
     render () {
         return (
         <div className="imageUploadForm">
-            <form action="http://localhost:8081/upload-image" method="post" enctype="multipart/form-data">
+            <form action="" method="post" enctype="multipart/form-data">
             <label for="file">Filename:</label>
                 <input type="file" name="image" id="image-upload" onChange={this.changeHandler} />
             <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
@@ -139,6 +140,216 @@ class ImageUpload extends React.Component {
         );
     }
 }
+
+class AdminInterface extends React.Component {
+    constructor(props) {
+        super (props);
+
+        this.changeHandler = this.changeHandler.bind(this);
+        this.handleSubmit = this.handleSubmit.bind(this);
+
+        this.state = {
+        };
+    }
+
+    changeHandler (v) {
+        this.setState({address: v.target.value});
+    }
+
+    async handleSubmit (t) {
+        t.preventDefault();
+        try {
+            const accounts = await window.ethereum.enable();
+            const account = accounts[0];
+            const address = this.state.address;
+            const gas = await siteContract.methods.addArtist(address).estimateGas();
+            // TODO show a spinner here
+            const post = siteContract.methods.addArtist(address).send({
+                from: account,
+                gas,
+            });
+            post.on('transactionHash', function(hash){
+                console.log("add artist transaction hash: " + hash);
+            }).on('receipt', function(receipt){
+                // TODO hide spinner here
+                alert(receipt);
+                console.log("add artist receipt");
+                console.log(receipt);
+            }).on('error', function(error, receipt) {
+                // TODO hide spinner here
+                alert(error);
+                alert(receipt);
+            });
+        } catch (error) {
+            console.log(error);
+            alert(error);
+        }
+    }
+
+    render () {
+        return (
+                <div>
+                <label for="artist_address">Artist address</label>
+                <input type="text" id="artist_address" name="artist_address" onChange={this.changeHandler}/>
+                <button className="button" onClick={this.handleSubmit} type="button">
+                Submit
+                </button>
+                </div>
+        );
+    }
+}
+
+class ArtistInterface extends React.Component {
+    constructor (props) {
+        super (props);
+
+        this.changeHandler = this.changeHandler.bind(this);
+        this.handleSubmit = this.handleSubmit.bind(this);
+        this.handleArtStart = this.handleArtStart.bind(this);
+
+        this.state = {
+        };
+    }
+
+    changeHandler (event) {
+        this.setState({file: event.target.files[0]});
+    };
+
+    async handleArtStart (t) {
+        t.preventDefault();
+        try {
+            const accounts = await window.ethereum.enable();
+            const account = accounts[0];
+            const address = this.state.address;
+            const gas = await siteContract.methods.startArt().estimateGas();
+            // TODO show a spinner here
+            const post = await siteContract.methods.startArt().send({
+                from: account,
+                gas,
+            });
+            post.on('transactionHash', function(hash){
+                console.log("start art transaction hash: " + hash);
+            }).on('receipt', function(receipt){
+                // TODO hide spinner here
+                alert(receipt);
+            }).on('error', function(error, receipt) {
+                // TODO hide spinner here
+                alert(error);
+                alert(receipt);
+            });
+        } catch (error) {
+            alert(error);
+        }
+    }
+
+    async handleSubmit () {
+        if (! this.state.file) {
+            alert ("no file");
+        } else {
+            const accounts = await window.ethereum.enable();
+            const account = accounts[0];
+
+
+
+            //
+            const domain = [
+                { name: "name", type: "string" },
+                { name: "version", type: "string" },
+                { name: "chainId", type: "uint256" },
+                { name: "verifyingContract", type: "address" },
+                { name: "salt", type: "bytes32" },
+            ];
+            const dataFormat = [
+                { name: "imageHash", type: "string" },
+                { name: ""}
+            ];
+            const identity = [
+                { name: "userId", type: "uint256" },
+                { name: "wallet", type: "address" },
+            ];
+
+            const domainData = {
+                name: "Play NFT",
+                version: process.env.REACT_APP_VERSION,
+                chainId: process.env.REACT_APP_CHAIN_ID,
+                verifyingContract: contractAddress,
+                salt: process.env.REACT_APP_SALT
+            };
+            var message = {
+                imageHash: web3.utils.sha3(this.state.file)
+            };
+
+            const data = JSON.stringify({
+                types: {
+                    EIP712Domain: domain,
+                    Dummy: dataFormat,
+                    Identity: identity,
+                },
+                domain: domainData,
+                primaryType: "Dummy",
+                message: message
+            });
+            web3.currentProvider.sendAsync(
+                {
+                    method: "eth_signTypedData_v3",
+                    params: [account, data],
+                    from: account
+                },
+                function(err, result) {
+                    if (err) {
+                        console.error(err);
+                    }
+                    const signature = result.result.substring(2);
+                    const r = "0x" + signature.substring(0, 64);
+                    const s = "0x" + signature.substring(64, 128);
+                    const v = parseInt(signature.substring(128, 130), 16);    // The signature is now comprised of r, s, and v.
+
+                    const formData = new FormData();
+                    formData.append("image", this.state.file);
+                    formData.append("signedData", data);
+                    formData.append("signature", signature);
+
+                    axios.post(apiHost + "/upload-image", formData)
+                        .then ((res) => {
+                            if (res.data.status) {
+                                alert (res.data.message);
+                            } else {
+                                alert (res.data);
+                            }
+                        }).catch ((err) => {
+                            alert ("error uploading file: " + err);
+                        });
+                }
+
+
+            );
+
+
+        }
+    }
+
+    // TODO eventually display dropdown for artist with list of completed bids to use to indentify art
+
+    render () {
+        return (
+        <div className="artInterface">
+            <div className="startArtButton">
+                <button className="button" onClick={this.handleArtStart} type="button">New Art</button>
+            </div>
+            <div className="uploadArt">
+                <form action="" method="post" enctype="multipart/form-data">
+                <label for="file">Filename:</label>
+                <input type="file" name="image" id="image-upload" onChange={this.changeHandler} />
+                <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
+                </form>
+            </div>
+        </div>
+        );
+    }
+}
+
+// TODO add art interface
+// web3.eth.sign("Hello world", "0x11f4d0A3c12e86B4b5F39B213F7E19D048276DAe").then(console.log);
 
 function App() {
     const [getTest, setTest] = useState("uninitialized dummy string");
@@ -168,6 +379,8 @@ function App() {
                 Get message from Rinkeby contract
                 </button>
                 {getTest}
+                <AdminInterface />
+                <ArtistInterface />
             </div>
        </div>
     );

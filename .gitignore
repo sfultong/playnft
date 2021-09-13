@@ -5,4 +5,5 @@ eth/.env
 react/node_modules/
 react/yarn.lock
 react/images/
+react/.env
 

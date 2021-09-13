@@ -22,6 +22,7 @@ contract Site is Admin {
   struct Artist {
     // uint32 id;
     string name;
+    string description;
     address payable addr;
   }
 
@@ -65,6 +66,7 @@ contract Site is Admin {
      return result;
   }
 
+  // probably isn't useful. We want to know if msg.sender matches specific artist generally
   modifier artist {
     require (isArtist(), "user is not an artist");
     _;
@@ -80,6 +82,24 @@ contract Site is Admin {
   //function getArtists () public view returns (Artist[] storage) {
   //  return artists;
   //}
+  
+  // change when struct definition changes
+  function getArt (uint i) public view returns (uint16, bool, int64) {
+    return (art[i].artistId, art[i].finished, art[i].currentFeatureId);
+  }
+
+  function getNumArt () public view returns (uint) {
+    return art.length;
+  }
+
+  // change when struct definition changes
+  function getArtist (uint i) public view returns (string memory, string memory, address payable) {
+    return (artists[i].name, artists[i].description, artists[i].addr);
+  }
+
+  function getNumArtist () public view returns (uint) {
+    return artist.length;
+  }
 
   function getDisplayFeature (uint16 artId) public view returns (int64) {
     int64 latestFeature = art[artId].currentFeatureId;
@@ -95,7 +115,7 @@ contract Site is Admin {
   }
 
   function addArtist (address payable _addr) public admin {
-    artists.push(Artist("", _addr));
+    artists.push(Artist("", "", _addr));
   }
 
   function startArt () public artist {
