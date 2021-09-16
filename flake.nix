@@ -24,7 +24,7 @@
     in {
       overlay = final: prev: {
         react_frontend = prev.callPackage ./react {};
-	eth_contracts = prev.callPackage ./eth {};
+	      eth_contracts = prev.callPackage ./eth {};
       };
 
       nixopsConfigurations.default = {
@@ -45,6 +45,8 @@
         devShell = pkgs.mkShell {
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
           buildInputs = [
+            pkgs.elm2nix
+            # pkgs.elmPackages # doesn't evaluate correctly
             pkgs.yarn
             pkgs.yarn2nix
             pkgs.nixopsUnstable
