@@ -17,6 +17,7 @@
     "build": "truffle compile",
     "console": "truffle console",
     "migrate": "truffle migrate",
+    "test": "truffle test",
     "startb": "node backend/server.js"
   }
 }
