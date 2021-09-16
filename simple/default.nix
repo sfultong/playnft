@@ -1,10 +1,10 @@
-{ # nixpkgs ? <nixpkgs>
-  pkgs
+{ nixpkgs ? <nixpkgs>
+  # pkgs
 , config ? {}
 }:
 
-# with (import nixpkgs config);
-with pkgs;
+with (import nixpkgs config);
+# with pkgs;
 
 let
   mkDerivation =

@@ -76,7 +76,7 @@ init : () -> ( Model, Cmd Msg )
 init networkId =
     let
         node =
-            Net.toNetworkId 0
+            Net.toNetworkId 1337
                 |> ethNode
     in
     ( { txSentry = TxSentry.init ( txOut, txIn ) TxSentryMsg node.http

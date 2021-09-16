@@ -23,7 +23,15 @@ import Json.Decode as Json
 import Task
 
 
-main : Program (Maybe Model) Model Msg
+-- main : Program (Maybe Model) Model Msg
+-- main =
+--     Browser.document
+--         { init = init
+--         , view = \model -> { title = "Elm • TodoMVC", body = [view model] }
+--         , update = updateWithStorage
+--         , subscriptions = \_ -> Sub.none
+--         }
+main : Program () Model Msg
 main =
     Browser.document
         { init = init
@@ -73,7 +81,9 @@ type alias Entry =
 
 emptyModel : Model
 emptyModel =
-    { entries = []
+    { entries = [ newEntry "a string" 8
+                , newEntry "another string" 9
+                ]
     , visibility = "All"
     , field = ""
     , uid = 0
@@ -89,9 +99,14 @@ newEntry desc id =
     }
 
 
-init : Maybe Model -> ( Model, Cmd Msg )
+-- init : Maybe Model -> ( Model, Cmd Msg )
+-- init maybeModel =
+--   ( Maybe.withDefault emptyModel maybeModel
+--   , Cmd.none
+--   )
+init : () -> ( Model, Cmd Msg )
 init maybeModel =
-  ( Maybe.withDefault emptyModel maybeModel
+  ( emptyModel
   , Cmd.none
   )
 
