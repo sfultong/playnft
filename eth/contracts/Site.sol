@@ -98,7 +98,7 @@ contract Site is Admin {
   }
 
   function getNumArtist () public view returns (uint) {
-    return artist.length;
+    return artists.length;
   }
 
   function getDisplayFeature (uint16 artId) public view returns (int64) {
