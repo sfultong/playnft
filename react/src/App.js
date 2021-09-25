@@ -61,7 +61,6 @@ const web3 = new Promise ((resolve, reject) => {
 
 const siteContract = new Promise ((resolve, reject) => {
     web3.then((w3) => {
-        console.log(w3);
         resolve(new w3.eth.Contract(site, contractAddress));
     });
 });
@@ -181,7 +180,7 @@ class ImageUpload extends React.Component {
         <div className="imageUploadForm">
             <form action="" method="post" enctype="multipart/form-data">
             <label for="file">Filename:</label>
-                <input type="file" name="image" id="image-upload" onChange={this.changeHandler} />
+                <input type="file" name="image2" id="image-upload2" onChange={this.changeHandler} />
             <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
             </form>
         </div>
@@ -198,6 +197,11 @@ class AdminInterface extends React.Component {
 
         this.state = {
         };
+        siteContract.then((sc) => {
+            sc.methods.getNumArtist().call().then((na) => {
+                this.setState({numArtists: na});
+            });
+        });
     }
 
     changeHandler (v) {
@@ -212,7 +216,9 @@ class AdminInterface extends React.Component {
                 sc.methods.addArtist(address).estimateGas().then((gas) => {
                     // TODO show a spinner here
                     try {
-                        const post = sc.methods.addArtist(address).send({
+                        const method = sc.methods.addArtist(address);
+                        console.log(method);
+                        const post = method.send({
                             from: account,
                             gas,
                         });
@@ -220,13 +226,19 @@ class AdminInterface extends React.Component {
                             console.log("add artist transaction hash: " + hash);
                         }).on('receipt', function(receipt){
                             // TODO hide spinner here
-                            alert(receipt);
-                            console.log("add artist receipt");
                             console.log(receipt);
+                            if (receipt.status) {
+                                alert("Added artist");
+                            } else {
+                                alert("something went wrong on receipt of transaction");
+                                console.log("add artist receipt");
+                                console.log(receipt);
+                            }
                         }).on('error', function(error, receipt) {
                             // TODO hide spinner here
-                            alert(error);
-                            alert(receipt);
+                            alert("transaction failed");
+                            console.log(error);
+                            console.log(receipt);
                         });
                     } catch (error) {
                         console.log(error);
@@ -239,12 +251,17 @@ class AdminInterface extends React.Component {
 
     render () {
         return (
+                <div className="adminInterface">
                 <div>
-                <label for="artist_address">Artist address</label>
-                <input type="text" id="artist_address" name="artist_address" onChange={this.changeHandler}/>
-                <button className="button" onClick={this.handleSubmit} type="button">
-                Submit
-                </button>
+                    <label for="artist_address">Artist address</label>
+                    <input type="text" id="artist_address" name="artist_address" onChange={this.changeHandler}/>
+                    <button className="button" onClick={this.handleSubmit} type="button">
+                    Submit
+                    </button>
+                </div>
+                <div>
+                Number of artists is currently: {this.state.numArtists}
+                </div>
                 </div>
         );
     }
@@ -262,9 +279,44 @@ class ArtistInterface extends React.Component {
         };
     }
 
+    constructMessage (imageHash, callback) {
+        web3.then ((w3) => {
+            w3.currentProvider.sendAsync({
+                method: 'net_version',
+                params: [],
+                jsonrpc: "2.0"
+            }, function (err, result) {
+                const netId = result.result;
+                const msgParams = JSON.stringify({types:{
+                    EIP712Domain:[
+                        {name:"name",type:"string"},
+                        {name:"version",type:"string"},
+                        {name:"chainId",type:"uint256"},
+                        {name:"verifyingContract",type:"address"}
+                    ],
+                    Message:[
+                        {name:"imageHash",type:"string"}
+                    ]
+                },
+                    primaryType:"Message",
+                    domain:{name:"Play NFT",
+                            version:process.env.REACT_APP_VERSION,
+                            chainId:process.env.REACT_APP_CHAIN_ID,
+                            verifyingContract:process.env.REACT_APP_CONTRACT_ADDRESS
+                            },
+                    message:{imageHash:imageHash}
+                });
+
+                callback(msgParams);
+            });
+        });
+    }
+
     changeHandler (event) {
+        console.log("image change handler");
+        console.log(event.target);
         this.setState({file: event.target.files[0]});
-    };
+    }
 
     async handleArtStart (t) {
         t.preventDefault();
@@ -283,10 +335,12 @@ class ArtistInterface extends React.Component {
                         }).on('receipt', function(receipt){
                             // TODO hide spinner here
                             alert(receipt);
+                            console.log(receipt);
                         }).on('error', function(error, receipt) {
                             // TODO hide spinner here
                             alert(error);
                             alert(receipt);
+                            console.log(error);
                         });
 
                     } catch (error) {
@@ -298,82 +352,47 @@ class ArtistInterface extends React.Component {
     }
 
     async handleSubmit () {
-        if (! this.state.file) {
+        var thisFile = this.state.file;
+        if (! thisFile) {
             alert ("no file");
         } else {
-            userAccount.then ((account) => {
-                const domain = [
-                    { name: "name", type: "string" },
-                    { name: "version", type: "string" },
-                    { name: "chainId", type: "uint256" },
-                    { name: "verifyingContract", type: "address" },
-                    { name: "salt", type: "bytes32" },
-                ];
-                const dataFormat = [
-                    { name: "imageHash", type: "string" },
-                    { name: ""}
-                ];
-                const identity = [
-                    { name: "userId", type: "uint256" },
-                    { name: "wallet", type: "address" },
-                ];
+            web3.then ((w3) => {
+                userAccount.then ((account) => {
+                    var imageHash = w3.utils.sha3(encodeURIComponent(thisFile.text()));
+                    console.log("imageHash");
+                    console.log(imageHash);
+                    this.constructMessage (w3.utils.sha3(imageHash), function (message) {
+                        console.log(message);
+                        w3.currentProvider.sendAsync(
+                            {
+                                method: "eth_signTypedData_v3",
+                                params: [account, message],
+                                from: account
+                            },
+                            function(err, result) {
+                                if (err) {
+                                    alert("signing error");
+                                    console.error(err);
+                                }
 
-                const domainData = {
-                    name: "Play NFT",
-                    version: process.env.REACT_APP_VERSION,
-                    chainId: process.env.REACT_APP_CHAIN_ID,
-                    verifyingContract: contractAddress,
-                    salt: process.env.REACT_APP_SALT
-                };
-                web3.then ((w3) => {
-                    var message = {
-                        imageHash: w3.utils.sha3(this.state.file)
-                    };
+                                const formData = new FormData();
+                                formData.append("image", thisFile);
+                                formData.append("signedData", message);
+                                formData.append("signature", result.result);
 
-                    const data = JSON.stringify({
-                        types: {
-                            EIP712Domain: domain,
-                            Dummy: dataFormat,
-                            Identity: identity,
-                        },
-                        domain: domainData,
-                        primaryType: "Dummy",
-                        message: message
-                    });
-                    w3.currentProvider.sendAsync(
-                        {
-                            method: "eth_signTypedData_v3",
-                            params: [account, data],
-                            from: account
-                        },
-                        function(err, result) {
-                            if (err) {
-                                console.error(err);
+                                axios.post(apiHost + "/upload-image", formData)
+                                    .then ((res) => {
+                                        if (res.data.status) {
+                                            alert (res.data.message);
+                                        } else {
+                                            alert (res.data);
+                                        }
+                                    }).catch ((err) => {
+                                        alert ("error uploading file: " + err);
+                                    });
                             }
-                            const signature = result.result.substring(2);
-                            const r = "0x" + signature.substring(0, 64);
-                            const s = "0x" + signature.substring(64, 128);
-                            const v = parseInt(signature.substring(128, 130), 16);    // The signature is now comprised of r, s, and v.
-
-                            const formData = new FormData();
-                            formData.append("image", this.state.file);
-                            formData.append("signedData", data);
-                            formData.append("signature", signature);
-
-                            axios.post(apiHost + "/upload-image", formData)
-                                .then ((res) => {
-                                    if (res.data.status) {
-                                        alert (res.data.message);
-                                    } else {
-                                        alert (res.data);
-                                    }
-                                }).catch ((err) => {
-                                    alert ("error uploading file: " + err);
-                                });
-                        }
-
-
-                    );
+                        );
+                    });
                 });
             });
         }
@@ -405,9 +424,11 @@ function App() {
 
     const messageGet = async (t) => {
 	      t.preventDefault();
-        siteContract()
-	      const post = await siteContract.methods.getTestMessage().call();
-	      setTest(post);
+        siteContract.then((sc) => {
+            sc.methods.getTestMessage().call().then((tm) => {
+                setTest(tm);
+            });
+        });
     };
 
     userAccount.then ((ua) => {

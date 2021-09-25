@@ -7,12 +7,12 @@ contract Admin {
          }
 
          function isAdmin () public view returns (bool) {
-           //return adminAddress == msg.sender; //TODO figure out why this doesn't work
-           return true;
+           return adminAddress == msg.sender; 
          }
 
          modifier admin {
-           require (isAdmin(), "user is not admin");
+           //require (isAdmin(), "user is not admin");
+           require (adminAddress == msg.sender, "user is not admin");
            _;
          }
 }
@@ -20,10 +20,10 @@ contract Admin {
 contract Site is Admin {
 
   struct Artist {
-    // uint32 id;
     string name;
     string description;
-    address payable addr;
+    bool enabled;
+    // address payable addr;
   }
 
   struct Feature {
@@ -36,7 +36,8 @@ contract Site is Admin {
 
   struct Art {
     // uint32 id;
-    uint16 artistId;
+    //uint16 artistId;
+    address artistAddress;
     bool finished;
     int64 currentFeatureId; // -1 if none
   }
@@ -49,7 +50,9 @@ contract Site is Admin {
     string request;
   }
 
-  Artist[] artists;
+  // Artist[] artists;
+  mapping (address => Artist) artists;
+  address[] artistAddresses;
   Art[] art;
   Feature[] features;
   Bid[] bids;
@@ -57,48 +60,34 @@ contract Site is Admin {
   string testMessage;
 
   function isArtist () public view returns (bool) {
-     bool result = false;
-     for (uint16 i = 0; i < artists.length; i++) {
-       if (msg.sender == artists[i].addr) {
-         result = true;
-       }
-     }
-     return result;
+     return artists[msg.sender].enabled;
   }
 
   // probably isn't useful. We want to know if msg.sender matches specific artist generally
   modifier artist {
-    require (isArtist(), "user is not an artist");
+    // require (isArtist(), "user is not an artist");  // does not work
+    require (artists[msg.sender].enabled, "user is not an artist");
     _;
   }
 
-  //mapping(uint64 => Art) public arts;
-  //uint public artsCount;
-
-  //function getArt () public view returns (Art[] storage) {
-  //  return art;
-  //}
-
-  //function getArtists () public view returns (Artist[] storage) {
-  //  return artists;
-  //}
-  
   // change when struct definition changes
-  function getArt (uint i) public view returns (uint16, bool, int64) {
-    return (art[i].artistId, art[i].finished, art[i].currentFeatureId);
+  function getArt (uint i) public view returns (address, bool, int64) {
+    return (art[i].artistAddress, art[i].finished, art[i].currentFeatureId);
   }
 
   function getNumArt () public view returns (uint) {
     return art.length;
   }
 
-  // change when struct definition changes
-  function getArtist (uint i) public view returns (string memory, string memory, address payable) {
-    return (artists[i].name, artists[i].description, artists[i].addr);
+  function getNumArtist () public view returns (uint) {
+    return artistAddresses.length;
   }
 
-  function getNumArtist () public view returns (uint) {
-    return artist.length;
+  function getArtist (uint i) public view returns (string memory, string memory, address payable) {
+    Artist memory a = artists[artistAddresses[i]];
+    address payable p = address(uint160(artistAddresses[i]));
+
+    return (a.name, a.description, p);
   }
 
   function getDisplayFeature (uint16 artId) public view returns (int64) {
@@ -114,21 +103,24 @@ contract Site is Admin {
     }
   }
 
-  function addArtist (address payable _addr) public admin {
-    artists.push(Artist("", "", _addr));
+  //TODO add admin back when fixed
+  function addArtist (address payable _addr) public {
+    // require (adminAddress == msg.sender, "user is not admin");
+    bool _isAdmin = adminAddress == msg.sender;
+    artists[_addr] = Artist("", "", true);
+    artistAddresses.push(_addr);
   }
 
-  function startArt () public artist {
-     for (uint16 i = 0; i < artists.length; i++) {
-       if (msg.sender == artists[i].addr) {
-          art.push(Art(i, false, -1));
-       }
-     }
+  //TODO add back artist modifier when fixed
+  function startArt () public {
+     bool isArtistA = isArtist();
+     bool isArtistB = artists[msg.sender].enabled;
+     art.push(Art(msg.sender, false, -1));
   }
 
   function startFeature (uint64 artId, uint _endTime) public artist {
     Art storage thisArt = art[artId];
-    require (artists[thisArt.artistId].addr == msg.sender, "can't start a feature for art you don't own!");
+    require (thisArt.artistAddress == msg.sender, "can't start a feature for art you don't own!");
 
     Feature memory thisFeature = Feature (now, _endTime, thisArt.currentFeatureId, -1, false);
     features.push(thisFeature);
@@ -187,7 +179,8 @@ contract Site is Admin {
          currentBid.addr.transfer(currentBid.amount); // need one last call for last bid
       }
 
-      artists[thisArt.artistId].addr.transfer(winningBid.amount); 
+      address payable aa = address(uint160(thisArt.artistAddress));
+      aa.transfer(winningBid.amount); 
 
     } else { // there are no bids!
       

@@ -2,6 +2,9 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const fileUpload = require('express-fileupload');
 const cors = require("cors");
+const Web3 = require("web3");
+const web3 = new Web3("http://localhost:8545"); //TODO parameterize provider
+require("dotenv").config();
 
 const app = express();
 
@@ -35,22 +38,35 @@ app.post('/upload-image', async (req, res) => {
                 message: 'File not uploaded'
             });
         } else {
-            //Use the name of the input field (i.e. "avatar") to retrieve the uploaded file
-            const image = req.files.image;
+            var artistAddr = web3.eth.accounts.recover(req.body.signedData, req.body.signature);
+            console.log("artistAddr");
+            console.log(artistAddr);
 
-            //Use the mv() method to place the file in upload directory (i.e. "uploads")
-            image.mv('./images/' + image.name);
+            if (! artistAddr) {
+                console.log("invalid signature ");
+                res.send({
+                    status: false,
+                    message: 'invalid signature   '
+                });
+            } else {
+                //Use the name of the input field (i.e. "avatar") to retrieve the uploaded file
+                const image = req.files.image;
 
-            //send response
-            res.send({
-                status: true,
-                message: 'File is uploaded',
-                data: {
-                    name: image.name,
-                    mimetype: image.mimetype,
-                    size: image.size
-                }
-            });
+                //Use the mv() method to place the file in upload directory (i.e. "uploads")
+                image.mv('./images/' + image.name);
+
+                //send response
+                res.send({
+                    status: true,
+                    message: 'File is uploaded',
+                    data: {
+                        name: image.name,
+                        mimetype: image.mimetype,
+                        size: image.size
+                    }
+                });
+            }
+
         }
     } catch (err) {
         console.log(err);
