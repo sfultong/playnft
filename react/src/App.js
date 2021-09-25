@@ -139,55 +139,6 @@ class MetaMaskButton extends React.Component {
     }
 }
 
-class ImageUpload extends React.Component {
-    constructor(props) {
-        super(props);
-
-        this.changeHandler = this.changeHandler.bind(this);
-        this.handleSubmit = this.handleSubmit.bind(this);
-
-        this.state = {
-        };
-
-    }
-
-    changeHandler (event) {
-        this.setState({file: event.target.files[0]});
-    };
-
-    handleSubmit () {
-        if (! this.state.file) {
-            alert ("no file");
-        } else {
-            const formData = new FormData();
-            formData.append("image", this.state.file);
-
-            axios.post(apiHost + "/upload-image", formData)
-                .then ((res) => {
-                    if (res.data.status) {
-                        alert (res.data.message);
-                    } else {
-                        alert (res.data);
-                    }
-                }).catch ((err) => {
-                    alert ("error uploading file: " + err);
-                });
-        }
-    }
-
-    render () {
-        return (
-        <div className="imageUploadForm">
-            <form action="" method="post" enctype="multipart/form-data">
-            <label for="file">Filename:</label>
-                <input type="file" name="image2" id="image-upload2" onChange={this.changeHandler} />
-            <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
-            </form>
-        </div>
-        );
-    }
-}
-
 class AdminInterface extends React.Component {
     constructor(props) {
         super (props);
@@ -440,7 +391,6 @@ function App() {
             <div>
             <img src="http://localhost:8081/caring_sam.jpg"/>
             </div>
-            <ImageUpload />
             <div className="card">
                 <MetaMaskButton />
                 <div>{getAddr}</div>
