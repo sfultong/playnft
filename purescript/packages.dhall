@@ -101,3 +101,96 @@ in  upstream
 let upstream =
       https://github.com/purescript/package-sets/releases/download/psc-0.14.4-20210919/packages.dhall sha256:03516fdd4f6d1bd6c9eb5e63cf3af3037bc079459117ab93eb85b6eb46e258a7
 in  upstream
+  with tagged =
+    { dependencies =
+        [ "identity"
+        , "profunctor"
+        ]
+    , repo =
+        "https://github.com/LiamGoodacre/purescript-tagged.git"
+    , version =
+        "v3.0.0"
+    }
+  with eth-core =
+    { dependencies =
+        [ "argonaut"
+        , "arrays"
+        , "bytestrings"
+        , "effect"
+        , "either"
+        , "foreign"
+        , "foreign-generic"
+        , "functions"
+        , "integers"
+        , "maybe"
+        , "node-buffer"
+        , "ordered-collections"
+        , "parsing"
+        , "partial"
+        , "prelude"
+        , "psci-support"
+        , "quotient"
+        , "ring-modules"
+        , "simple-json"
+        , "strings"
+        , "unsafe-coerce"
+        ]
+    , repo =
+        "https://github.com/f-o-a-m/purescript-eth-core.git"
+    , version =
+        "v7.0.0"
+    }
+  with coroutine-transducers =
+    { dependencies = [ "aff", "coroutines", "effect", "maybe", "psci-support" ]
+    , repo =
+        "https://github.com/blinky3713/purescript-coroutine-transducers.git"
+    , version =
+        "v1.0.0"
+    }
+  with web3 =
+    { dependencies =
+        [ "aff"
+        , "coroutines"
+        , "coroutine-transducers"
+        , "effect"
+        , "errors"
+        , "eth-core"
+        , "foreign"
+        , "foreign-generic"
+        , "fork"
+        , "heterogeneous"
+        , "parsing"
+        , "partial"
+        , "profunctor-lenses"
+        , "psci-support"
+        , "tagged"
+        , "transformers"
+        , "typelevel-prelude"
+        , "variant"
+        , "argonaut"
+        , "arrays"
+        , "bifunctors"
+        , "bytestrings"
+        , "control"
+        , "either"
+        , "exceptions"
+        , "foldable-traversable"
+        , "foreign-object"
+        , "integers"
+        , "maybe"
+        , "newtype"
+        , "parallel"
+        , "prelude"
+        , "record"
+        , "ring-modules"
+        , "simple-json"
+        , "strings"
+        , "tailrec"
+        , "tuples"
+        , "unfoldable"
+        ]
+    , repo =
+       "https://github.com/f-o-a-m/purescript-web3.git"
+    , version =
+        "v4.0.0"
+    }

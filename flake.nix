@@ -61,6 +61,8 @@
             easy-ps.psc-package
             easy-ps.spago
             pkgs.nodejs
+            pkgs.ghc
+            # pkgs.stack
             # nixops.packages.nixops-gce
             # nixops.defaultPackage.${system}
           ];
