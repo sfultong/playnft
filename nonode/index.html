@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="web3.min.js"></script>
+        <script src="constants.js"></script>
+        <script src="abi.js"></script>
+        <script>
+         window.onload = function () {
+             const web3 = new Web3(constants.providerHost);
+             console.log("web3");
+             console.log(web3);
+             const contract = new web3.eth.Contract(site, constants.contractAddress);
+             console.log("contract");
+             console.log(contract);
+             contract.methods.getTestMessage().call().then((tm) => {
+                 document.getElementById("testText").innerHTML = tm;
+             });
+         };
+        </script>
+    </head>
+    <body>
+        <h1>Ok, done</h1>
+        <p id="testText">This should be replaced by contract data</p>
+    </body>
+</html>
