@@ -7,8 +7,8 @@ react/yarn.lock
 react/images/
 react/.env
 
-elm/elm-stuff
-elm/elm.js
+# elm/elm-stuff
+# elm/elm.js
 
 # elm-stuff/
 # Test.elm
@@ -19,3 +19,14 @@ elm/elm.js
 # index.html
 # .idea/
 # dist/
+
+bower_components/
+node_modules/
+.pulp-cache/
+output/
+generated-docs/
+.psc-package/
+.psc*
+.purs*
+.psa*
+.spago

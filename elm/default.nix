@@ -1,7 +1,9 @@
+# { pkgs, ... }:
+# with pkgs;
+
 { nixpkgs ? <nixpkgs>
 , config ? {}
 }:
-
 with (import nixpkgs config);
 
 let
@@ -37,6 +39,7 @@ let
           cp index.html $out/index.html
           cp abi.js $out/abi.js
           cp web3.min.js $out/web3.min.js
+          cp detect-provider.min.js $out/detect-provider.min.js
           cp index.js $out/index.js
           ${lib.optionalString outputJavaScript ''
             echo "minifying ${elmfile module}"
@@ -54,4 +57,3 @@ in mkDerivation {
   srcdir = "./src";
   outputJavaScript = true;
 }
-

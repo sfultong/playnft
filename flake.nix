@@ -3,6 +3,10 @@
   nixConfig.bash-prompt-suffix = "\\033[1;33m(playNFT)\\033[0m ";
 
   inputs = {
+    easy-purescript-nix = {
+      url = "github:justinwoo/easy-purescript-nix";
+      flake = false;
+    };
     nixpkgs.url = "nixpkgs/nixos-unstable";
     # nixops.url  = "github:lukebfox/nixops-plugged";
     nixops.url = "github:NixOS/nixops";
@@ -13,7 +17,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixops, utils, flake-compat, ... }:
+  outputs = { self, nixpkgs, nixops, utils, flake-compat, easy-purescript-nix, ... }:
     let
       domain = "playnft.hhefesto.com";
       pkgsFor = system: import nixpkgs {
@@ -39,17 +43,24 @@
 
     } // utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let pkgs = pkgsFor system;
+          easy-ps = import easy-purescript-nix { inherit pkgs; };
       in {
         defaultPackage = pkgs.eth_contracts;
 
         devShell = pkgs.mkShell {
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
           buildInputs = [
-            pkgs.elm2nix
+            # pkgs.elm2nix
             # pkgs.elmPackages # doesn't evaluate correctly
             pkgs.yarn
             pkgs.yarn2nix
+
             pkgs.nixopsUnstable
+
+            easy-ps.purs-0_14_4
+            easy-ps.psc-package
+            easy-ps.spago
+            pkgs.nodejs
             # nixops.packages.nixops-gce
             # nixops.defaultPackage.${system}
           ];
