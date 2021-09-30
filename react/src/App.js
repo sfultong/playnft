@@ -7,47 +7,12 @@ import './App.css';
 // This function detects most providers injected at window.ethereum
 import detectEthereumProvider from '@metamask/detect-provider';
 
-//const web3 = new Web3(Web3.givenProvider);
-
 const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
 const apiHost = process.env.REACT_APP_API_HOST;
-//const siteContract = new web3.eth.Contract(site, contractAddress);
 
 const installMetamask = 0;
 const loginMetamask = 1;
 const activeMetamask = 2;
-
-
-// const web3 = (function () {
-//     var provider;
-//     var web3;
-//     var init = false;
-
-//     return async function () {
-//         if (! init) {
-//             while (! provider) {
-//                 provider = await detectEthereumProvider();
-//                 await new Promise(r => setTimeout(r, 2000));
-//             }
-
-//             web3 = new Web3(provider);
-//         }
-//         return web3;
-//     };
-// })();
-
-// const siteContract = (function () {
-//     var sc;
-
-//     return async function () {
-//         if (! sc) {
-//             const web3_ = await web3();
-//             sc = new web3_.eth.Contract(site, contractAddress);
-//         }
-
-//         return sc;
-//     };
-// })();
 
 const web3 = new Promise ((resolve, reject) => {
     detectEthereumProvider().then((provider) => {
@@ -72,6 +37,97 @@ const userAccount = new Promise ((resolve, reject) => {
         });
     });
 });
+
+const startArtWithFeature = function () {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            userAccount.then ((account) => {
+                sc.methods.startArtWithFeature().estimateGas().then((gas) => {
+                    sc.methods.startArtWithFeature().send({
+                        from: account,
+                        gas,
+                    }).on('error', function(error, receipt) {
+                        reject(error);
+                    }).on('receipt', function(receipt) {
+                        resolve(receipt);
+                    });
+                });
+            });
+        });
+    });
+};
+
+
+const startFeature = function (artId, endTime) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            userAccount.then ((account) => {
+                const method = sc.methods.startFeature(artId, endTime);
+                method.estimateGas().then((gas) => {
+                    method.send({
+                        from: account,
+                        gas,
+                    }).on('error', function(error, receipt) {
+                        reject(error);
+                    }).on('receipt', function(receipt) {
+                        resolve(receipt);
+                    });
+                });
+            });
+        });
+    });
+};
+
+const signFeatureImage = function (featureId, imageHash) {
+    return new Promise((resolve, reject) => {
+        web3.then ((w3) => {
+            userAccount.then ((account) => {
+                w3.currentProvider.sendAsync({
+                    method: 'net_version',
+                    params: [],
+                    jsonrpc: "2.0"
+                }, function (err, result) {
+                    const netId = result.result;
+                    const msgParams = JSON.stringify({types:{
+                        EIP712Domain:[
+                            {name:"name",type:"string"},
+                            {name:"version",type:"string"},
+                            {name:"chainId",type:"uint256"},
+                            {name:"verifyingContract",type:"address"}
+                        ],
+                        Message:[
+                            {name:"featureId",type:"uint64"},
+                            {name:"imageHash",type:"string"}
+                        ]
+                    },
+                        primaryType:"Message",
+                        domain:{name:"Play NFT",
+                                version:process.env.REACT_APP_VERSION,
+                                chainId:process.env.REACT_APP_CHAIN_ID,
+                                verifyingContract:process.env.REACT_APP_CONTRACT_ADDRESS
+                                },
+                        message:{featureId:featureId, imageHash:imageHash}
+                    });
+
+                    w3.currentProvider.sendAsync(
+                        {
+                            method: "eth_signTypedData_v3",
+                            params: [account, msgParams],
+                            from: account
+                        },
+                        function(err, result) {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve({message: msgParams, signature: result.result});
+                            }
+                        }
+                    );
+                });
+            });
+        });
+    });
+};
 
 
 class MetaMaskButton extends React.Component {
@@ -168,7 +224,6 @@ class AdminInterface extends React.Component {
                     // TODO show a spinner here
                     try {
                         const method = sc.methods.addArtist(address);
-                        console.log(method);
                         const post = method.send({
                             from: account,
                             gas,
@@ -203,6 +258,7 @@ class AdminInterface extends React.Component {
     render () {
         return (
                 <div className="adminInterface">
+                <h1>Admin Interface</h1>
                 <div>
                     <label for="artist_address">Artist address</label>
                     <input type="text" id="artist_address" name="artist_address" onChange={this.changeHandler}/>
@@ -222,7 +278,8 @@ class ArtistInterface extends React.Component {
     constructor (props) {
         super (props);
 
-        this.changeHandler = this.changeHandler.bind(this);
+        this.imageChangeHandler = this.imageChangeHandler.bind(this);
+        this.featureEndChangeHandler = this.featureEndChangeHandler.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
         this.handleArtStart = this.handleArtStart.bind(this);
 
@@ -230,119 +287,47 @@ class ArtistInterface extends React.Component {
         };
     }
 
-    constructMessage (imageHash, callback) {
-        web3.then ((w3) => {
-            w3.currentProvider.sendAsync({
-                method: 'net_version',
-                params: [],
-                jsonrpc: "2.0"
-            }, function (err, result) {
-                const netId = result.result;
-                const msgParams = JSON.stringify({types:{
-                    EIP712Domain:[
-                        {name:"name",type:"string"},
-                        {name:"version",type:"string"},
-                        {name:"chainId",type:"uint256"},
-                        {name:"verifyingContract",type:"address"}
-                    ],
-                    Message:[
-                        {name:"imageHash",type:"string"}
-                    ]
-                },
-                    primaryType:"Message",
-                    domain:{name:"Play NFT",
-                            version:process.env.REACT_APP_VERSION,
-                            chainId:process.env.REACT_APP_CHAIN_ID,
-                            verifyingContract:process.env.REACT_APP_CONTRACT_ADDRESS
-                            },
-                    message:{imageHash:imageHash}
-                });
-
-                callback(msgParams);
-            });
-        });
-    }
-
-    changeHandler (event) {
-        console.log("image change handler");
-        console.log(event.target);
+    imageChangeHandler (event) {
         this.setState({file: event.target.files[0]});
     }
 
-    async handleArtStart (t) {
-        t.preventDefault();
-        siteContract.then((sc) => {
-            userAccount.then ((account) => {
-                sc.methods.startArt().estimateGas().then((gas) => {
-                    const address = this.state.address;
-                    try {
-                        // TODO show a spinner here
-                        const post = sc.methods.startArt().send({
-                            from: account,
-                            gas,
-                        });
-                        post.on('transactionHash', function(hash){
-                            console.log("start art transaction hash: " + hash);
-                        }).on('receipt', function(receipt){
-                            // TODO hide spinner here
-                            alert(receipt);
-                            console.log(receipt);
-                        }).on('error', function(error, receipt) {
-                            // TODO hide spinner here
-                            alert(error);
-                            alert(receipt);
-                            console.log(error);
-                        });
-
-                    } catch (error) {
-                        alert(error);
-                    }
-                });
-            });
-        });
+    featureEndChangeHandler (event) {
+        const localEndTime = new Date(event.target.value);
+        this.setState({featureEndTime: localEndTime.getTime()});
     }
 
     async handleSubmit () {
-        var thisFile = this.state.file;
+        const thisFile = this.state.file;
+        const featureEndTime = this.state.featureEndTime;
+
         if (! thisFile) {
             alert ("no file");
         } else {
             web3.then ((w3) => {
-                userAccount.then ((account) => {
-                    var imageHash = w3.utils.sha3(encodeURIComponent(thisFile.text()));
-                    console.log("imageHash");
-                    console.log(imageHash);
-                    this.constructMessage (w3.utils.sha3(imageHash), function (message) {
-                        console.log(message);
-                        w3.currentProvider.sendAsync(
-                            {
-                                method: "eth_signTypedData_v3",
-                                params: [account, message],
-                                from: account
-                            },
-                            function(err, result) {
-                                if (err) {
-                                    alert("signing error");
-                                    console.error(err);
-                                }
+                startArtWithFeature().then((receipt) => {
+                    const artId = receipt.events.ArtCreated.returnValues.artId;
+                    const featureId = receipt.events.FeatureCreated.returnValues.featureId;
+                    const imageHash = w3.utils.sha3(encodeURIComponent(thisFile.text()));
+                    signFeatureImage(featureId, imageHash).then((signResult) => {
+                        const formData = new FormData();
+                        formData.append("image", thisFile);
+                        formData.append("signedData", signResult.message);
+                        formData.append("signature", signResult.signature);
+                        formData.append("feature", featureId);
 
-                                const formData = new FormData();
-                                formData.append("image", thisFile);
-                                formData.append("signedData", message);
-                                formData.append("signature", result.result);
-
-                                axios.post(apiHost + "/upload-image", formData)
-                                    .then ((res) => {
-                                        if (res.data.status) {
-                                            alert (res.data.message);
-                                        } else {
-                                            alert (res.data);
-                                        }
-                                    }).catch ((err) => {
-                                        alert ("error uploading file: " + err);
-                                    });
+                        axios.post(apiHost + "/upload-image", formData).then ((res) => {
+                            if (res.data.status) {
+                                startFeature(artId, featureEndTime).then((featureReceipt) => {
+                                    alert ("new art created");
+                                    console.log(receipt);
+                                });
+                            } else {
+                                alert ("error uploading image");
+                                console.log (res.data);
                             }
-                        );
+                        }).catch ((err) => {
+                            alert ("error uploading file: " + err);
+                        });
                     });
                 });
             });
@@ -354,14 +339,14 @@ class ArtistInterface extends React.Component {
     render () {
         return (
         <div className="artInterface">
-            <div className="startArtButton">
-                <button className="button" onClick={this.handleArtStart} type="button">New Art</button>
-            </div>
+            <h1>Artist Interface</h1>
             <div className="uploadArt">
                 <form action="" method="post" enctype="multipart/form-data">
-                <label for="file">Filename:</label>
-                <input type="file" name="image" id="image-upload" onChange={this.changeHandler} />
-                <button className="button" onClick={this.handleSubmit} type="button">Submit</button>
+                <label for="featureEndTime">Feature Auction Ends At:</label>
+                <input type="datetime-local" name="featureEndTime" id="featureEndTime" onChange={this.featureEndChangeHandler}/>
+                <label for="file">Image:</label>
+                <input type="file" name="image" id="image-upload" onChange={this.imageChangeHandler} />
+                <button className="button" onClick={this.handleSubmit} type="button">New Art</button>
                 </form>
             </div>
         </div>

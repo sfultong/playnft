@@ -12,6 +12,32 @@ export const site = [
       "type": "constructor"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "artId",
+          "type": "uint64"
+        }
+      ],
+      "name": "ArtCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "featureId",
+          "type": "uint64"
+        }
+      ],
+      "name": "FeatureCreated",
+      "type": "event"
+    },
+    {
       "constant": true,
       "inputs": [],
       "name": "isAdmin",
@@ -53,9 +79,9 @@ export const site = [
       "name": "getArt",
       "outputs": [
         {
-          "internalType": "uint16",
+          "internalType": "address",
           "name": "",
-          "type": "uint16"
+          "type": "address"
         },
         {
           "internalType": "bool",
@@ -76,6 +102,21 @@ export const site = [
       "constant": true,
       "inputs": [],
       "name": "getNumArt",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "getNumArtist",
       "outputs": [
         {
           "internalType": "uint256",
@@ -112,21 +153,6 @@ export const site = [
           "internalType": "address payable",
           "name": "",
           "type": "address"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "getNumArtist",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
         }
       ],
       "payable": false,
@@ -200,6 +226,15 @@ export const site = [
     },
     {
       "constant": false,
+      "inputs": [],
+      "name": "startArtWithFeature",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
       "inputs": [
         {
           "internalType": "uint64",
@@ -260,4 +295,3 @@ export const site = [
       "type": "function"
     }
   ];
-

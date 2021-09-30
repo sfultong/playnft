@@ -59,6 +59,9 @@ contract Site is Admin {
 
   string testMessage;
 
+  event FeatureCreated (uint64 featureId);
+  event ArtCreated (uint64 artId);
+
   function isArtist () public view returns (bool) {
      return artists[msg.sender].enabled;
   }
@@ -118,13 +121,25 @@ contract Site is Admin {
      art.push(Art(msg.sender, false, -1));
   }
 
-  function startFeature (uint64 artId, uint _endTime) public artist {
+  //TODO add back artist modifier when fixed
+  function startFeature (uint64 artId, uint _endTime) public {
     Art storage thisArt = art[artId];
-    require (thisArt.artistAddress == msg.sender, "can't start a feature for art you don't own!");
+    //require (thisArt.artistAddress == msg.sender, "can't start a feature for art you don't own!");
 
     Feature memory thisFeature = Feature (now, _endTime, thisArt.currentFeatureId, -1, false);
     features.push(thisFeature);
     thisArt.currentFeatureId = int64(features.length - 1);
+  }
+
+  // starts art with an initial feature already filled in by the artist
+  function startArtWithFeature () public {
+    Feature memory startFeature = Feature (now, now, -1, -1, true);
+    features.push(startFeature);
+    int64 featureId = int64(features.length - 1);
+    emit FeatureCreated(uint64(featureId));
+
+    art.push(Art(msg.sender, false, featureId));
+    emit ArtCreated(uint64(art.length - 1));
   }
 
   // TODO make sure you can't bid on feature auctions that have ended

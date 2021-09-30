@@ -37,6 +37,11 @@ app.post('/upload-image', async (req, res) => {
                 status: false,
                 message: 'File not uploaded'
             });
+        } else if (!req.body.feature) {
+            res.send({
+                status: false,
+                message: 'Feature not specified'
+            });
         } else {
             var artistAddr = web3.eth.accounts.recover(req.body.signedData, req.body.signature);
             console.log("artistAddr");
@@ -53,7 +58,7 @@ app.post('/upload-image', async (req, res) => {
                 const image = req.files.image;
 
                 //Use the mv() method to place the file in upload directory (i.e. "uploads")
-                image.mv('./images/' + image.name);
+                image.mv('./images/' + req.body.feature + '.png');
 
                 //send response
                 res.send({
