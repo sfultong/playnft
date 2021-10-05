@@ -86,6 +86,26 @@ const getDisplayFeature = function (artId) {
     });
 };
 
+const modifyArtistProfile = function (name, description) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            userAccount.then ((account) => {
+                const method = sc.methods.modifyArtistProfile(name, description);
+                method.estimateGas().then((gas) => {
+                    method.send({
+                        from: account,
+                        gas,
+                    }).on('error', function(error, receipt) {
+                        reject(error);
+                    }).on('receipt', function(receipt) {
+                        resolve(receipt);
+                    });
+                });
+            });
+        });
+    });
+};
+
 const startArtWithFeature = function () {
     return new Promise((resolve, reject) => {
         siteContract.then((sc) => {
@@ -329,12 +349,32 @@ class ArtistInterface extends React.Component {
     constructor (props) {
         super (props);
 
+        this.nameChangeHandler = this.nameChangeHandler.bind(this);
+        this.descriptionChangeHandler = this.descriptionChangeHandler.bind(this);
         this.imageChangeHandler = this.imageChangeHandler.bind(this);
         this.featureEndChangeHandler = this.featureEndChangeHandler.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
+        this.profileSubmit = this.profileSubmit.bind(this);
 
         this.state = {
         };
+    }
+
+    componentDidMount() {
+        const thisComponent = this;
+        userAccount.then ((account) => {
+            getArtist(account).then((artist) => {
+                thisComponent.setState({artistName: artist[0], artistDescription: artist[1]});
+            });
+        });
+    }
+
+    nameChangeHandler (event) {
+        this.setState({artistName: event.target.value});
+    }
+
+    descriptionChangeHandler (event) {
+        this.setState({artistDescription: event.target.value});
     }
 
     imageChangeHandler (event) {
@@ -344,6 +384,15 @@ class ArtistInterface extends React.Component {
     featureEndChangeHandler (event) {
         const localEndTime = new Date(event.target.value);
         this.setState({featureEndTime: localEndTime.getTime() / 1000});
+    }
+
+    profileSubmit () {
+        const thisComponent = this;
+        userAccount.then ((account) => {
+            modifyArtistProfile(thisComponent.state.artistName, thisComponent.state.artistDescription).then((result) => {
+                alert("modified profile");
+            });
+        });
     }
 
     async handleSubmit () {
@@ -390,6 +439,13 @@ class ArtistInterface extends React.Component {
         return (
         <div className="artInterface">
             <h1>Artist Interface</h1>
+            <div className="updateProfile">
+                <label for="artistNameField">Name</label>
+                <input type="text" name="artistNameField" onChange={this.nameChangeHandler} value={this.state.artistName}/>
+                <label for="artistDescriptionField">Bio</label>
+                <textarea name="artistDescriptionField" onChange={this.descriptionChangeHandler} rows="8" cols="120" value={this.state.artistDescription}/>
+                <button className="button" onClick={this.profileSubmit} type="button">Update Profile</button>
+            </div>
             <div className="uploadArt">
                 <form action="" method="post" enctype="multipart/form-data">
                 <label for="featureEndTime">Feature Auction Ends At:</label>

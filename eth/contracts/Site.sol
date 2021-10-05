@@ -120,6 +120,12 @@ contract Site is Admin {
     artistAddresses.push(_addr);
   }
 
+  function modifyArtistProfile (string memory _name, string memory _description) public {
+    Artist storage artist = artists[msg.sender];
+    artist.name = _name;
+    artist.description = _description;
+  }
+
   //TODO add back artist modifier when fixed
   function startArt () public {
      bool isArtistA = isArtist();
