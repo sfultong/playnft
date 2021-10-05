@@ -1,9 +1,7 @@
-# { pkgs, ... }:
-# with pkgs;
-
 { nixpkgs ? <nixpkgs>
 , config ? {}
 }:
+
 with (import nixpkgs config);
 
 let
@@ -39,8 +37,8 @@ let
           cp index.html $out/index.html
           cp abi.js $out/abi.js
           cp web3.min.js $out/web3.min.js
-          cp detect-provider.min.js $out/detect-provider.min.js
           cp index.js $out/index.js
+          cp products.json $out/products.json
           ${lib.optionalString outputJavaScript ''
             echo "minifying ${elmfile module}"
             uglifyjs $out/${module}.${extension} --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' \
@@ -55,5 +53,6 @@ in mkDerivation {
   src = ./.;
   targets = ["Main"];
   srcdir = "./src";
-  outputJavaScript = true;
+  outputJavaScript = false;
 }
+

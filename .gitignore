@@ -10,15 +10,14 @@ react/.env
 # elm/elm-stuff
 # elm/elm.js
 
-# elm-stuff/
-# Test.elm
-# elm.js
-# .DS_Store
-# node_modules/
-# *-notes.*
-# index.html
-# .idea/
-# dist/
+elm-stuff/
+Test.elm
+elm.js
+.DS_Store
+node_modules/
+*-notes.*
+.idea/
+dist/
 
 bower_components/
 node_modules/
@@ -30,3 +29,6 @@ generated-docs/
 .purs*
 .psa*
 .spago
+
+
+result*
