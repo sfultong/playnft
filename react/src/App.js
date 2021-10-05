@@ -38,6 +38,54 @@ const userAccount = new Promise ((resolve, reject) => {
     });
 });
 
+const getNumArt = function () {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getNumArt().call().then((r) => resolve(r[0]));
+        });
+    });
+};
+
+const getNumArtists = function () {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getNumArtist().call().then((r) => resolve(r[0]));
+        });
+    });
+};
+
+const getArt = function (artId) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getArt(artId).call().then(resolve);
+        });
+    });
+};
+
+const getArtist = function (artistAddress) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getArtist(artistAddress).call().then(resolve);
+        });
+    });
+};
+
+const getFeature = function (featureId) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getFeature(featureId).call().then(resolve);
+        });
+    });
+};
+
+const getDisplayFeature = function (artId) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getDisplayFeature(artId).call().then((r) => resolve(r[0]));
+        });
+    });
+};
+
 const startArtWithFeature = function () {
     return new Promise((resolve, reject) => {
         siteContract.then((sc) => {
@@ -204,6 +252,9 @@ class AdminInterface extends React.Component {
 
         this.state = {
         };
+    }
+
+    componentDidMount() {
         siteContract.then((sc) => {
             sc.methods.getNumArtist().call().then((na) => {
                 this.setState({numArtists: na});
@@ -281,7 +332,6 @@ class ArtistInterface extends React.Component {
         this.imageChangeHandler = this.imageChangeHandler.bind(this);
         this.featureEndChangeHandler = this.featureEndChangeHandler.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
-        this.handleArtStart = this.handleArtStart.bind(this);
 
         this.state = {
         };
@@ -293,7 +343,7 @@ class ArtistInterface extends React.Component {
 
     featureEndChangeHandler (event) {
         const localEndTime = new Date(event.target.value);
-        this.setState({featureEndTime: localEndTime.getTime()});
+        this.setState({featureEndTime: localEndTime.getTime() / 1000});
     }
 
     async handleSubmit () {
@@ -354,6 +404,86 @@ class ArtistInterface extends React.Component {
     }
 }
 
+class ArtListing extends React.Component {
+    constructor (props) {
+        super(props);
+        this.state = {
+        };
+    }
+
+    render () {
+        return (
+                <div className="artListing">
+                <h3>{this.props.artistName}</h3>
+                <img src={this.props.imgUrl}/>
+                <p className="listingFeatureEnd">{this.props.endTime}</p>
+                </div>
+        );
+    }
+}
+
+class ArtDisplay extends React.Component {
+    constructor (props) {
+        super (props);
+
+        this.state = {
+            artList: []
+        };
+    }
+
+    componentDidMount() {
+        const thisComponent = this;
+        getNumArt().then((na) => {
+            console.log("number of art is " + na);
+            var artPromise = function (i) {
+                return new Promise ((resolve, reject) => {
+                    getArt(i).then((art) => {
+                        const currentFeatureId = art[2];
+                        getArtist(art[0]).then((artist) => {
+                            getDisplayFeature(i).then((fid) => {
+                                const endTimeCallback = (timeText) => {
+                                    const imgUrl = apiHost + "/" + fid + ".png";
+                                    resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText });
+                                };
+                                if (currentFeatureId > -1) {
+                                    getFeature(currentFeatureId).then((feature) => {
+                                        console.log("feature");
+                                        console.log(feature);
+                                        const endTime = new Date(feature[1] * 1000);
+                                        endTimeCallback("Bidding ending at " + endTime);
+                                    });
+                                } else {
+                                    endTimeCallback("Not open for bidding yet");
+                                }
+                            });
+                        });
+                    });
+                });
+            };
+            var artPromises = [];
+            for (var i = 1; i <= 10 && na - i >= 0; i++) {
+                var artId = na - i;
+                artPromises.push(artPromise(artId));
+            }
+            Promise.all(artPromises).then((artList) => thisComponent.setState({artList: artList}));
+        });
+    }
+
+    render () {
+        const list = this.state.artList.map((artItem) => {
+            return (
+                    <ArtListing artistName={artItem.artistName} imgUrl={artItem.imgUrl} endTime={artItem.timeText} />
+            );
+        });
+        return (
+                <div className="artDisplay">
+                <h1>Art Listings</h1>
+                {list}
+                </div>
+        );
+    }
+}
+
 function App() {
     const [getTest, setTest] = useState("uninitialized dummy string");
     const [getAddr, setAddr] = useState("no address loaded");
@@ -385,6 +515,7 @@ function App() {
                 {getTest}
                 <AdminInterface />
                 <ArtistInterface />
+                <ArtDisplay />
             </div>
        </div>
     );

@@ -132,9 +132,9 @@ export const site = [
       "constant": true,
       "inputs": [
         {
-          "internalType": "uint256",
-          "name": "i",
-          "type": "uint256"
+          "internalType": "address",
+          "name": "artistAddress",
+          "type": "address"
         }
       ],
       "name": "getArtist",
@@ -174,6 +174,47 @@ export const site = [
           "internalType": "int64",
           "name": "",
           "type": "int64"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "featureId",
+          "type": "uint64"
+        }
+      ],
+      "name": "getFeature",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "int64",
+          "name": "",
+          "type": "int64"
+        },
+        {
+          "internalType": "int64",
+          "name": "",
+          "type": "int64"
+        },
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "payable": false,

@@ -86,17 +86,18 @@ contract Site is Admin {
     return artistAddresses.length;
   }
 
-  function getArtist (uint i) public view returns (string memory, string memory, address payable) {
-    Artist memory a = artists[artistAddresses[i]];
-    address payable p = address(uint160(artistAddresses[i]));
+  function getArtist (address artistAddress) public view returns (string memory, string memory, address payable) {
+    Artist memory a = artists[artistAddress];
+    address payable p = address(uint160(artistAddress));
 
     return (a.name, a.description, p);
   }
 
   function getDisplayFeature (uint16 artId) public view returns (int64) {
-    int64 latestFeature = art[artId].currentFeatureId;
+    Art memory thisArt = art[artId];
+    int64 latestFeature = thisArt.currentFeatureId;
     if (latestFeature > -1) {
-      if (now > features[uint64(latestFeature)].endTime) {
+      if (thisArt.finished) {
         return latestFeature;
       } else {
         return features[uint(latestFeature)].lastFeatureId;
@@ -104,6 +105,11 @@ contract Site is Admin {
     } else {
       return -1;
     }
+  }
+
+  function getFeature (uint64 featureId) public view returns (uint, uint, int64, int64, bool) {
+    Feature memory f = features[uint(featureId)];
+    return (f.startTime,f.endTime,f.lastFeatureId,f.currentBidId,f.accepted);
   }
 
   //TODO add admin back when fixed
