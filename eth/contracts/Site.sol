@@ -154,6 +154,11 @@ contract Site is Admin {
     emit ArtCreated(uint64(art.length - 1));
   }
 
+  function getBid (uint64 bidId) public view returns (int64, address payable, uint, string memory) {
+    Bid memory b = bids[bidId];
+    return (b.lowerBidId, b.addr, b.amount, b.request);
+  }
+
   // TODO make sure you can't bid on feature auctions that have ended
   function makeBid (uint64 artId, string memory _request) public payable returns (bool, string memory) {
     Art memory thisArt = art[artId];
@@ -166,7 +171,7 @@ contract Site is Admin {
         if (msg.value > oldBid.amount) {
           Bid memory newBid = Bid (thisFeature.currentBidId, msg.sender, msg.value, _request);
           bids.push(newBid);
-          thisFeature.lastFeatureId = int64(bids.length - 1);
+          thisFeature.currentBidId = int64(bids.length - 1);
           return (true, "You're now the top bidder!");
 
         } else { // insufficient bid
@@ -176,7 +181,7 @@ contract Site is Admin {
       } else { // very first bid
         Bid memory newBid = Bid (-1, msg.sender, msg.value, _request);
         bids.push(newBid);
-        thisFeature.lastFeatureId = int64(bids.length - 1);
+        thisFeature.currentBidId = int64(bids.length - 1);
         return (true, "You've made the very first bid!");
       }
 

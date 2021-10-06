@@ -295,6 +295,42 @@ export const site = [
       "type": "function"
     },
     {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "bidId",
+          "type": "uint64"
+        }
+      ],
+      "name": "getBid",
+      "outputs": [
+        {
+          "internalType": "int64",
+          "name": "",
+          "type": "int64"
+        },
+        {
+          "internalType": "address payable",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "constant": false,
       "inputs": [
         {

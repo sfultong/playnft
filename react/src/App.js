@@ -86,6 +86,14 @@ const getDisplayFeature = function (artId) {
     });
 };
 
+const getBid = function (bidId) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            sc.methods.getBid(bidId).call().then(resolve);
+        });
+    });
+};
+
 const modifyArtistProfile = function (name, description) {
     return new Promise((resolve, reject) => {
         siteContract.then((sc) => {
@@ -135,6 +143,27 @@ const startFeature = function (artId, endTime) {
                     method.send({
                         from: account,
                         gas,
+                    }).on('error', function(error, receipt) {
+                        reject(error);
+                    }).on('receipt', function(receipt) {
+                        resolve(receipt);
+                    });
+                });
+            });
+        });
+    });
+};
+
+const makeBid = function (artId, request, amount) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            userAccount.then ((account) => {
+                const method = sc.methods.makeBid(artId, request);
+                method.estimateGas({value: amount}).then((gas) => {
+                    method.send({
+                        from: account,
+                        gas,
+                        value: amount
                     }).on('error', function(error, receipt) {
                         reject(error);
                     }).on('receipt', function(receipt) {
@@ -463,8 +492,38 @@ class ArtistInterface extends React.Component {
 class ArtListing extends React.Component {
     constructor (props) {
         super(props);
+
+        this.changeBidAmount = this.changeBidAmount.bind(this);
+        this.changeFeatureRequest = this.changeFeatureRequest.bind(this);
+        this.submitBid = this.submitBid.bind(this);
+
         this.state = {
+            featureRequest: props.featureRequest,
+            bidAmount: props.bidAmount
         };
+    }
+
+    changeBidAmount (event) {
+        this.setState({myBidAmount:event.target.value});
+    }
+
+    changeFeatureRequest (event) {
+        this.setState({myFeatureRequest:event.target.value});
+    }
+
+    submitBid () {
+        const myBid = this.state.myBidAmount;
+        const myRequest = this.state.myFeatureRequest;
+        const thisComponent = this;
+
+        if (myBid * 1 <= this.state.bidAmount * 1) {
+            alert("you must make a higher bid");
+        } else {
+            makeBid(this.props.artId, myRequest, myBid).then((receipt) => {
+                alert("You are now the highest bidder!");
+                thisComponent.setState({featureRequest:"Feature request: " + myRequest, bidAmount:"Bid amount: " + myBid});
+            });
+        }
     }
 
     render () {
@@ -472,7 +531,21 @@ class ArtListing extends React.Component {
                 <div className="artListing">
                 <h3>{this.props.artistName}</h3>
                 <img src={this.props.imgUrl}/>
+                <div className="listingBid">
+                    <div>{this.state.bidAmount}</div>
+                    <div>{this.state.featureRequest}</div>
+                </div>
                 <p className="listingFeatureEnd">{this.props.endTime}</p>
+                <div className="listingMakeBid">
+                    <p>Request a feature</p>
+                    <form action="" method="post" enctype="multipart/form-data">
+                    <label for="myBidAmount">Amount</label>
+                    <input type="text" name="myBidAmount" onChange={this.changeBidAmount}/>
+                    <label for="myFeatureRequest">Request</label>
+                    <input type="text" name="myFeatureRequest" onChange={this.changeFeatureRequest} />
+                    <button className="button" onClick={this.submitBid} type="button">Make Request</button>
+                    </form>
+                </div>
                 </div>
         );
     }
@@ -490,26 +563,34 @@ class ArtDisplay extends React.Component {
     componentDidMount() {
         const thisComponent = this;
         getNumArt().then((na) => {
-            console.log("number of art is " + na);
             var artPromise = function (i) {
                 return new Promise ((resolve, reject) => {
                     getArt(i).then((art) => {
                         const currentFeatureId = art[2];
                         getArtist(art[0]).then((artist) => {
                             getDisplayFeature(i).then((fid) => {
-                                const endTimeCallback = (timeText) => {
+                                const endTimeCallback = (timeText, bidAmount, featureRequest) => {
                                     const imgUrl = apiHost + "/" + fid + ".png";
-                                    resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText });
+                                    resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText
+                                             , bidAmount: bidAmount, featureRequest: featureRequest, artId:i });
                                 };
                                 if (currentFeatureId > -1) {
                                     getFeature(currentFeatureId).then((feature) => {
                                         console.log("feature");
                                         console.log(feature);
                                         const endTime = new Date(feature[1] * 1000);
-                                        endTimeCallback("Bidding ending at " + endTime);
+                                        const bidId = feature[3];
+                                        const timeText = "Bidding ending at " + endTime;
+                                        if (bidId > -1) {
+                                            getBid(bidId).then((bid) => {
+                                                endTimeCallback(timeText, "Bid amount: " + bid[2], "Feature request: " + bid[3]);
+                                            });
+                                        } else {
+                                            endTimeCallback(timeText, "", "No bids yet");
+                                        }
                                     });
                                 } else {
-                                    endTimeCallback("Not open for bidding yet");
+                                    endTimeCallback("Not open for bidding yet", "", "");
                                 }
                             });
                         });
@@ -522,13 +603,25 @@ class ArtDisplay extends React.Component {
                 artPromises.push(artPromise(artId));
             }
             Promise.all(artPromises).then((artList) => thisComponent.setState({artList: artList}));
+
+
+            // listen for new art to display
+            siteContract.then((sc) => {
+                sc.events.ArtCreated().on('data', event => {
+                    console.log("art created event");
+                    console.log(event);
+                    //artPromise(event.returnValues.artId).then((artItem) => {
+                    //    thisComponent.setState({artList: thisComponent.state.artList.unshift(artItem)});
+                    //});
+                });
+            });
         });
     }
 
     render () {
         const list = this.state.artList.map((artItem) => {
             return (
-                    <ArtListing artistName={artItem.artistName} imgUrl={artItem.imgUrl} endTime={artItem.timeText} />
+                    <ArtListing artistName={artItem.artistName} imgUrl={artItem.imgUrl} endTime={artItem.timeText} bidAmount={artItem.bidAmount} featureRequest={artItem.featureRequest} artId={artItem.artId}/>
             );
         });
         return (
