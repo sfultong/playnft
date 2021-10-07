@@ -57,6 +57,8 @@
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
           buildInputs = [
             pkgs.elmPackages.elm
+            pkgs.elmPackages.elm-live
+            pkgs.elmPackages.create-elm-app
             pkgs.elm2nix
             # pkgs.elmPackages # doesn't evaluate correctly
             pkgs.yarn
