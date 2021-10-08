@@ -195,9 +195,9 @@ contract Site is Admin {
   // TODO make this callable only by artist who owns artwork?
   function endBidding (uint64 artId) public {
     Art memory thisArt = art[artId];
-    require (thisArt.currentFeatureId > -1, "can't end bidding when there is no current feature");
+    // require (thisArt.currentFeatureId > -1, "can't end bidding when there is no current feature");
     Feature storage thisFeature = features[uint(thisArt.currentFeatureId)];
-    require (now > thisFeature.endTime, "Can't end auction prematurely");
+    // require (now > thisFeature.endTime, "Can't end auction prematurely");
 
     if (thisFeature.currentBidId > -1) {
       Bid memory winningBid = bids[uint(thisFeature.currentBidId)];
@@ -221,6 +221,11 @@ contract Site is Admin {
     thisFeature.accepted = true;
   }
 
+  function nextFeature (uint64 artId, uint endTime) public {
+    endBidding(artId);
+    startFeature(artId, endTime);
+  }
+
   function getTestMessage() public view returns (string memory) {
     return testMessage;
   }
@@ -228,5 +233,11 @@ contract Site is Admin {
   constructor (address _admin) public {
     adminAddress =_admin;
     testMessage = "A test has passed";
+  }
+
+  function finishArt (uint64 artId) public {
+    endBidding(artId);
+    Art storage thisArt = art[artId];
+    thisArt.finished = true;
   }
 }
