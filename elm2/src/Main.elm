@@ -253,6 +253,7 @@ menu model = Navbar.config NavMsg
       [ Navbar.itemLink [ href "#artist" ] [ text "Artist Interface" ]
       , Navbar.itemLink [ href "#admin" ] [ text "Administrator Interface" ]
       ]
+  -- |> Navbar.attrs [ class "navbar navbar-expand-lg navbar-dark navbar-custom fixed-top" ]
   |> Navbar.view model.navState
 
 mainContent : Model -> Html Msg
@@ -300,8 +301,10 @@ pageArtistInterface model =
                       Nothing -> "Hello, stranger! Specify your artist name to log in."
           ]
   , input [ placeholder "Artist's name", onInput SetArtist ] []
-  , Form.group []
-      [ Form.form []
+  -- , Form.group []
+  , div []
+      [ div []
+        -- Form.form []
           [ h2 [] [ text model.artistState.title ]
           , input [ placeholder "your art's tile", onInput SetTitle ] []
           , viewPreview model.artistState.imagePreview
@@ -312,7 +315,7 @@ pageArtistInterface model =
               , Button.attrs [ onClick PickFile ]
               ]
               [ text "Select File" ]
-          , Form.label [] [ text "Pick a date:" ]
+          , label [] [ text "Pick a date:" ]
           , DatePicker.view model.artistState.selectedAuctionEndDate settings model.artistState.datePicker
               |> Html.map ToDatePicker
           , Button.button

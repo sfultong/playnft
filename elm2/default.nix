@@ -38,6 +38,7 @@ let
           cp abi.js $out/abi.js
           cp constants.js $out/constants.js
           cp web3.min.js $out/web3.min.js
+          cp datepicker.css $out/datepicker.css
           cp custom.css $out/custom.css
           ${lib.optionalString outputJavaScript ''
             echo "minifying ${elmfile module}"
