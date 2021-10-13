@@ -36,9 +36,10 @@ let
           elm make ${elmfile module} --output $out/${module}.${extension} --docs $out/share/doc/${module}.json
           cp index.html $out/index.html
           cp abi.js $out/abi.js
+          cp constants.js $out/constants.js
           cp web3.min.js $out/web3.min.js
-          cp index.js $out/index.js
-          cp products.json $out/products.json
+          cp datepicker.css $out/datepicker.css
+          cp custom.css $out/custom.css
           ${lib.optionalString outputJavaScript ''
             echo "minifying ${elmfile module}"
             uglifyjs $out/${module}.${extension} --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' \
@@ -53,6 +54,6 @@ in mkDerivation {
   src = ./.;
   targets = ["Main"];
   srcdir = "./src";
-  outputJavaScript = false;
+  outputJavaScript = true;
 }
 

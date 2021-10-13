@@ -7,9 +7,6 @@ react/yarn.lock
 react/images/
 react/.env
 
-# elm/elm-stuff
-# elm/elm.js
-
 elm-stuff/
 Test.elm
 elm.js
@@ -19,16 +16,6 @@ node_modules/
 .idea/
 dist/
 
-bower_components/
-node_modules/
-.pulp-cache/
-output/
-generated-docs/
-.psc-package/
-.psc*
-.purs*
-.psa*
-.spago
-
+Main.min.js
 
 result*

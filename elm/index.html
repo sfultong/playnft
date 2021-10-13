@@ -1,54 +1,40 @@
-<!DOCTYPE HTML>
+
+<!DOCTYPE html>
 <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script type="text/javascript" src="Main.min.js"></script>
+    <script src="web3.min.js"></script>
+    <script src="constants.js"></script>
+    <script src="abi.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="datepicker.css">
+    <!-- <link rel="stylesheet" href="custom.css"> -->
+    <style>
 
-<head>
-  <meta charset="UTF-8">
-  <title>Elm • playNFT</title>
-  <script type="text/javascript" src="Main.min.js"></script>
-  <script src="web3.min.js"></script>
-  <script src="abi.js"></script>
-  <script src="products.json"></script>
-  <script type="text/javascript" src="index.js"></script>
-  <link rel="stylesheet" href="style.css">
-</head>
+    </style>
 
-<body>
-  <div id="playNFT"></div>
-  <div id="other">
-    <input type="button" onClick="app.ports.messageReceiver.send('someRandomString');"> Something <\input>
-  </div>
-</body>
 
-<script type="text/javascript">
-  window.addEventListener('load', (event) => {
-      console.log('page is fully loaded');
-      const web3 = new Web3(Web3.givenProvider);
-
-      const contractAddress = "0xAC4FbD2f46eBfd6b68BFA5cfF93fe9BAFBB73ACa"; // process.env.CONTRACT_ADDRESS;
-      // const apiHost = process.env.REACT_APP_API_HOST;
-      const siteContract = new web3.eth.Contract(site, contractAddress);
-  });
-
-  var app = Elm.Main.init({
+    <script>
+      window.onload = function () {
+          const web3 = new Web3(constants.providerHost);
+          console.log("web3");
+          console.log(web3);
+          const contract = new web3.eth.Contract(site, constants.contractAddress);
+          console.log("contract");
+          console.log(contract);
+          contract.methods.getTestMessage().call().then((tm) => {
+              document.getElementById("testText").innerHTML = tm;
+          });
+      };
+    </script>
+  </head>
+  <body>
+    <div id="playNFT"></div>
+  </body>
+  <script type="text/javascript">
+    var app = Elm.Main.init({
       node: document.getElementById('playNFT')
-  });
-  var socket = new WebSocket('ws://localhost:8082');
-
-  // When a command goes to the `sendMessage` port, we pass the message
-  // along to the WebSocket.
-  app.ports.sendMessage.subscribe(function(message) {
-      socket.send(message);
-  });
-
-  // When a message comes into our WebSocket, we pass the message along
-  // to the `messageReceiver` port.
-  socket.addEventListener("message", function(event) {
-      app.ports.messageReceiver.send(event.data);
-  });
-  
-  // socket.addEventListener("open", () => {
-  //     socket.send("sent by elm html file")
-  // });
-</script>
-
-</html>
+    });
+  </script>
