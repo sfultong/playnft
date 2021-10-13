@@ -14,11 +14,14 @@ import Bootstrap.Alert as Alert
 import Bootstrap.Navbar as Navbar
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
+import Bootstrap.Grid.Row as Row
 import Bootstrap.Card as Card
 import Bootstrap.Form as Form
 import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as Listgroup
+import Bootstrap.Tab as Tab
+import Bootstrap.Text as Text
 import File exposing (File)
 import File.Select as Select
 import Task
@@ -33,6 +36,7 @@ type alias Model =
   , artListings : List ArtListing
   , artistState : ArtistState
   , today : Maybe Date
+  , tabState : Tab.State
   }
 
 type alias ArtistState =
@@ -58,6 +62,7 @@ type Msg
   | SetTitle String
   | SetArtist String
   | ReceiveDate Date
+  | TabMsg Tab.State
 
 type alias ArtListing =
   { art : File
@@ -100,6 +105,7 @@ init flags url key =
                             , page = ArtListingsInterface
                             , artListings = []
                             , today = Nothing
+                            , tabState = Tab.initialState
                             , artistState = { loggedArtist = Nothing
                                             , artFile = Nothing
                                             , imagePreview = ""
@@ -119,6 +125,7 @@ init flags url key =
 
 subscriptions : Model -> Sub Msg
 subscriptions model = Sub.batch [ Navbar.subscriptions model.navState NavMsg
+                                , Tab.subscriptions model.tabState TabMsg
                                 , Alert.subscriptions model.artistState.newListingErrorVisibility PrepareListing
                                 ]
 
@@ -141,7 +148,9 @@ setTitle : ArtistState -> String -> ArtistState
 setTitle sart str = { sart | title = str }
 
 setArtist : ArtistState -> String -> ArtistState
-setArtist sart str = { sart | loggedArtist = Just { name = str } }
+setArtist sart str = if str == ""
+                       then { sart | loggedArtist = Nothing }
+                       else { sart | loggedArtist = Just { name = str } }
 
 setArtFile : ArtistState -> File -> ArtistState
 setArtFile sart file = { sart | artFile = Just file }
@@ -154,6 +163,10 @@ fromJust mx = case mx of
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
+  TabMsg state ->
+    ( { model | tabState = state }
+    , Cmd.none
+    )
   NewListing l -> ( { model | artListings = model.artListings ++ [l] }, Cmd.none )
   ReceiveDate date -> ( { model | today = Just date }, Cmd.none)
   SetArtist str -> ( setArtistState model <| setArtist model.artistState str, Cmd.none )
@@ -205,17 +218,12 @@ update msg model = case msg of
 
 settings : DatePicker.Settings
 settings =
-    let
-        isDisabled date =
-            [ Sat, Sun ]
-                |> List.member (weekday date)
-    in
-    { defaultSettings
-        | isDisabled = isDisabled
-        , inputClassList = [ ( "form-control", True ) ]
-        , inputName = Just "date"
-        , inputId = Just "date-field"
-    }
+  { defaultSettings
+      | isDisabled = \x -> False
+      , inputClassList = [ ( "form-control", True ) ]
+      , inputName = Just "date"
+      , inputId = Just "date-field"
+  }
 
 urlUpdate : Url -> Model -> ( Model, Cmd Msg )
 urlUpdate url model = case decode url of
@@ -266,7 +274,13 @@ mainContent model = Grid.container [] <|
 
 pageArtListingsInterface : Model -> List (Html Msg)
 pageArtListingsInterface model =
-  [ h1 [] [ text "Art Listings" ]
+  [ Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , h1 [] [ text "Art Listings" ]
+          , br [] []
+          ]
+      ]
   , Grid.row []
       [ Grid.col [] <| List.map makeCardFromListing model.artListings
       ]
@@ -296,50 +310,105 @@ makeCardFromListing artListing =
 
 pageArtistInterface : Model -> List (Html Msg)
 pageArtistInterface model =
+  [ Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , h1 [] [ text "Artist Interface" ]
+          , br [] []
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col []
+          [ Tab.config TabMsg
+              |> Tab.withAnimation
+              |> Tab.fill
+              |> Tab.items
+                   [ Tab.item
+                       { id = "artistListingsTab"
+                       , link = Tab.link [] [ text "My Listings" ]
+                       , pane = Tab.pane [] <| artistListingsTab model
+                       }
+                   , Tab.item
+                       { id = "newArtListingTab"
+                       , link = Tab.link [] [ text "New Art Listing" ]
+                       , pane = Tab.pane [] <| artistNewArtListingTab model
+                       }
+                   , Tab.item
+                       { id = "artistProfileTab"
+                       , link = Tab.link [] [ text "Profile" ]
+                       , pane = Tab.pane [] <| artistProfileTab model
+                       }
+                   ]
+              |> Tab.view model.tabState
+          ]
+      ]
+  ]
+
+artistListingsTab : Model -> List (Html Msg)
+artistListingsTab model =
+  [ text "Artist's listings from function"
+  ]
+
+artistProfileTab : Model -> List (Html Msg)
+artistProfileTab model =
   [ h2 [] [ text <| case model.artistState.loggedArtist of
                       Just artist -> "Welcome, " ++ artist.name ++ "!"
                       Nothing -> "Hello, stranger! Specify your artist name to log in."
           ]
   , input [ placeholder "Artist's name", onInput SetArtist ] []
-  -- , Form.group []
-  , div []
-      [ div []
-        -- Form.form []
-          [ h2 [] [ text model.artistState.title ]
-          , input [ placeholder "your art's tile", onInput SetTitle ] []
-          , viewPreview model.artistState.imagePreview
-          , Button.button
-              [ Button.secondary
-              , Button.large
-              , Button.block
-              , Button.attrs [ onClick PickFile ]
-              ]
-              [ text "Select File" ]
-          , label [] [ text "Pick a date:" ]
-          , DatePicker.view model.artistState.selectedAuctionEndDate settings model.artistState.datePicker
-              |> Html.map ToDatePicker
-          , Button.button
-              [ Button.primary
-              , Button.large
-              , Button.block
-              , Button.attrs [ onClick <| PrepareListing Alert.closed ]
-              ]
-              [ text "New Art Listing" ]
-          , Alert.config
-              -- |> Alert.dismissable PrepareListing
-              |> Alert.warning
-              |> Alert.children
-                  [ Alert.h4 [] [ text "Not a complete art listing" ]
-                  , text "You must select a file and an auction date end."
-                  ]
-              |> Alert.view model.artistState.newListingErrorVisibility
-          ]
+  ]
+
+artistNewArtListingTab : Model -> List (Html Msg)
+artistNewArtListingTab model =
+  [ h2 [] [ text model.artistState.title ]
+  , input [ placeholder "your art's tile", onInput SetTitle ] []
+  , viewPreview model.artistState.imagePreview
+  , Button.button
+      [ Button.secondary
+      , Button.large
+      , Button.block
+      , Button.attrs [ onClick PickFile ]
       ]
-  ] ++ pageArtListingsInterface model -- TODO: remove this
+      [ text "Select File" ]
+  , label [] [ text "Pick a date:" ]
+  , DatePicker.view model.artistState.selectedAuctionEndDate settings model.artistState.datePicker
+      |> Html.map ToDatePicker
+  , Button.button
+      [ Button.primary
+      , Button.large
+      , Button.block
+      , Button.attrs [ onClick <| PrepareListing Alert.closed ]
+      ]
+      [ text "New Art Listing" ]
+  , Alert.config
+      -- |> Alert.dismissable PrepareListing
+      |> Alert.warning
+      |> Alert.children
+          [ Alert.h4 [] [ text "Not a complete art listing" ]
+          , text "You must select a file and an auction date end."
+          ]
+      |> Alert.view model.artistState.newListingErrorVisibility
+  ]
 
 pageAdminInterface : Model -> List (Html Msg)
 pageAdminInterface model =
-  [ h1 [] [ text "Administrator Interface" ]
+  [ Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , h1 [] [ text "Administrator Interface" ]
+          , br [] []
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.md2 ] [ h4 [] [ text "Artist adress:" ] ]
+      , Grid.col [] [ input [ placeholder "your art's tile"
+                            , size 30
+                            , style "margin" "10px"
+                            ]
+                        []
+                    , Button.button [] [ text "Submit" ]
+                    ]
+      ]
   ]
 
 pageNotFound : List (Html Msg)
