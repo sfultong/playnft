@@ -14,6 +14,7 @@ const installMetamask = 0;
 const loginMetamask = 1;
 const activeMetamask = 2;
 
+// --- section for simple promises that are initialized once, and then never changed --------------------
 const web3 = new Promise ((resolve, reject) => {
     detectEthereumProvider().then((provider) => {
         if (provider) {
@@ -38,6 +39,7 @@ const userAccount = new Promise ((resolve, reject) => {
     });
 });
 
+// --- section for Promise wrappers around web3 functions ----------------------
 const getNumArt = function () {
     return new Promise((resolve, reject) => {
         siteContract.then((sc) => {
@@ -90,6 +92,31 @@ const getBid = function (bidId) {
     return new Promise((resolve, reject) => {
         siteContract.then((sc) => {
             sc.methods.getBid(bidId).call().then(resolve);
+        });
+    });
+};
+
+const addArtist = function (address) {
+    return new Promise((resolve, reject) => {
+        siteContract.then((sc) => {
+            userAccount.then ((account) => {
+                sc.methods.addArtist(address).estimateGas().then((gas) => {
+                    try {
+                        const method = sc.methods.addArtist(address);
+                        const post = method.send({
+                            from: account,
+                            gas,
+                        }).on('receipt', function(receipt){
+                            resolve(receipt);
+                        }).on('error', function(error, receipt) {
+                            reject(error);
+                        });
+                    } catch (error) {
+                        console.log(error);
+                        alert(error);
+                    }
+                });
+            });
         });
     });
 };
@@ -266,6 +293,122 @@ const signFeatureImage = function (featureId, imageHash) {
     });
 };
 
+// --- section for component control methods ------------------------------------------
+
+// returns solidity receipt for finishArt or nextFeature
+const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageFile) {
+    return new Promise((resolve, reject) => {
+        web3.then ((w3) => {
+            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.text()));
+
+            signFeatureImage(featureId, imageHash).then((signResult) => {
+                const formData = new FormData();
+                formData.append("image", imageFile);
+                formData.append("signedData", signResult.message);
+                formData.append("signature", signResult.signature);
+                formData.append("feature", featureId);
+
+                axios.post(apiHost + "/upload-image", formData).then ((res) => {
+                    if (res.data.status) {
+
+                        if (completeArtwork) {
+                            finishArt(artId).then((receipt) => {
+                                resolve(receipt);
+                            });
+
+                        } else {
+                            nextFeature(artId, featureEndTime).then((featureReceipt) => {
+                                resolve(featureReceipt);
+                            });
+                        }
+                    } else {
+                        reject({error: "error uploading image", result:res});
+                    }
+                }).catch ((err) => {
+                    reject({error: "problem signing/posting image", result:err});
+                });
+            });
+        });
+    });
+};
+
+// TODO should probably utilize controlCompleteFeature
+// returns solidity receipt for startFeature
+const controlStartArtWithFeature = function (featureEndTime, imageFile) {
+    return new Promise((resolve, reject) => {
+        web3.then ((w3) => {
+            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.getText()));
+            startArtWithFeature().then((receipt) => {
+                const artId = receipt.events.ArtCreated.returnValues.artId;
+                const featureId = receipt.events.FeatureCreated.returnValues.featureId;
+
+                signFeatureImage(featureId, imageHash).then((signResult) => {
+                    const formData = new FormData();
+                    formData.append("image", imageFile);
+                    formData.append("signedData", signResult.message);
+                    formData.append("signature", signResult.signature);
+                    formData.append("feature", featureId);
+
+                    axios.post(apiHost + "/upload-image", formData).then ((res) => {
+                        if (res.data.status) {
+                            startFeature(artId, featureEndTime).then((featureReceipt) => {
+                                resolve(receipt);
+                            });
+                        } else {
+                            reject({error: "problem uploading image", result:res});
+                        }
+                    }).catch ((err) => {
+                        reject({error: "problem signing/posting image", result:err});
+                    });
+                });
+            });
+        });
+
+    });
+};
+
+// returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
+const getArtDisplay = function (i) { // i is the artId
+    return new Promise ((resolve, reject) => {
+        getArt(i).then((art) => {
+            const currentFeatureId = art[2];
+            getArtist(art[0]).then((artist) => {
+                getDisplayFeature(i).then((fid) => {
+                    const endTimeCallback = (timeText, bidAmount, featureRequest) => {
+                        const imgUrl = apiHost + "/" + fid + ".png";
+                        resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText
+                                 , bidAmount: bidAmount, featureRequest: featureRequest, artId:i, featureId:currentFeatureId });
+                    };
+
+                    if (art[1]) {
+                        endTimeCallback("Artwork is complete", "", "");
+
+                    } else if (currentFeatureId > -1) {
+                        getFeature(currentFeatureId).then((feature) => {
+                            console.log("feature");
+                            console.log(feature);
+                            const endTime = new Date(feature[1] * 1000);
+                            const bidId = feature[3];
+                            const timeText = "Bidding ending at " + endTime;
+                            if (bidId > -1) {
+                                getBid(bidId).then((bid) => {
+                                    endTimeCallback(timeText, "Bid amount: " + bid[2], "Feature request: " + bid[3]);
+                                });
+                            } else {
+                                endTimeCallback(timeText, "", "No bids yet");
+                            }
+                        });
+
+                    } else {
+                        endTimeCallback("Not open for bidding yet", "", "");
+                    }
+                });
+            });
+        });
+    });
+};
+
+
 
 class MetaMaskButton extends React.Component {
     constructor(props) {
@@ -357,41 +500,9 @@ class AdminInterface extends React.Component {
 
     async handleSubmit (t) {
         t.preventDefault();
-        siteContract.then((sc) => {
-            userAccount.then ((account) => {
-                const address = this.state.address;
-                sc.methods.addArtist(address).estimateGas().then((gas) => {
-                    // TODO show a spinner here
-                    try {
-                        const method = sc.methods.addArtist(address);
-                        const post = method.send({
-                            from: account,
-                            gas,
-                        });
-                        post.on('transactionHash', function(hash){
-                            console.log("add artist transaction hash: " + hash);
-                        }).on('receipt', function(receipt){
-                            // TODO hide spinner here
-                            console.log(receipt);
-                            if (receipt.status) {
-                                alert("Added artist");
-                            } else {
-                                alert("something went wrong on receipt of transaction");
-                                console.log("add artist receipt");
-                                console.log(receipt);
-                            }
-                        }).on('error', function(error, receipt) {
-                            // TODO hide spinner here
-                            alert("transaction failed");
-                            console.log(error);
-                            console.log(receipt);
-                        });
-                    } catch (error) {
-                        console.log(error);
-                        alert(error);
-                    }
-                });
-            });
+        const address = this.state.address;
+        addArtist(address).then((receipt) => {
+            alert("added artist");
         });
     }
 
@@ -472,33 +583,11 @@ class ArtistInterface extends React.Component {
         if (! thisFile) {
             alert ("no file");
         } else {
-            web3.then ((w3) => {
-                startArtWithFeature().then((receipt) => {
-                    const artId = receipt.events.ArtCreated.returnValues.artId;
-                    const featureId = receipt.events.FeatureCreated.returnValues.featureId;
-                    const imageHash = w3.utils.sha3(encodeURIComponent(thisFile.text()));
-                    signFeatureImage(featureId, imageHash).then((signResult) => {
-                        const formData = new FormData();
-                        formData.append("image", thisFile);
-                        formData.append("signedData", signResult.message);
-                        formData.append("signature", signResult.signature);
-                        formData.append("feature", featureId);
-
-                        axios.post(apiHost + "/upload-image", formData).then ((res) => {
-                            if (res.data.status) {
-                                startFeature(artId, featureEndTime).then((featureReceipt) => {
-                                    alert ("new art created");
-                                    console.log(receipt);
-                                });
-                            } else {
-                                alert ("error uploading image");
-                                console.log (res.data);
-                            }
-                        }).catch ((err) => {
-                            alert ("error uploading file: " + err);
-                        });
-                    });
-                });
+            controlStartArtWithFeature(featureEndTime, thisFile).then(receipt => {
+                alert("new art created");
+            }, err => {
+                alert(err.error);
+                console.log(err);
             });
         }
     }
@@ -586,48 +675,8 @@ class ArtListing extends React.Component {
         }
     }
 
-    artPromise (i) {
-        return new Promise ((resolve, reject) => {
-            getArt(i).then((art) => {
-                const currentFeatureId = art[2];
-                getArtist(art[0]).then((artist) => {
-                    getDisplayFeature(i).then((fid) => {
-                        const endTimeCallback = (timeText, bidAmount, featureRequest) => {
-                            const imgUrl = apiHost + "/" + fid + ".png";
-                            resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText
-                                     , bidAmount: bidAmount, featureRequest: featureRequest, artId:i, featureId:currentFeatureId });
-                        };
-
-                        if (art[1]) {
-                            endTimeCallback("Artwork is complete", "", "");
-
-                        } else if (currentFeatureId > -1) {
-                            getFeature(currentFeatureId).then((feature) => {
-                                console.log("feature");
-                                console.log(feature);
-                                const endTime = new Date(feature[1] * 1000);
-                                const bidId = feature[3];
-                                const timeText = "Bidding ending at " + endTime;
-                                if (bidId > -1) {
-                                    getBid(bidId).then((bid) => {
-                                        endTimeCallback(timeText, "Bid amount: " + bid[2], "Feature request: " + bid[3]);
-                                    });
-                                } else {
-                                    endTimeCallback(timeText, "", "No bids yet");
-                                }
-                            });
-
-                        } else {
-                            endTimeCallback("Not open for bidding yet", "", "");
-                        }
-                    });
-                });
-            });
-        });
-    }
-
     componentDidMount() {
-        this.artPromise(this.props.artId).then((art) => {this.setState(art);});
+        getArtDisplay(this.props.artId).then((art) => {this.setState(art);});
     }
 
     completeFeature () {
@@ -637,38 +686,12 @@ class ArtListing extends React.Component {
         const completeArtwork = this.state.completeArtwork;
         const featureEndTime = this.state.featureEndTime;
 
-        web3.then ((w3) => {
-            const imageHash = w3.utils.sha3(encodeURIComponent(thisFile.text()));
-
-            signFeatureImage(featureId, imageHash).then((signResult) => {
-                const formData = new FormData();
-                formData.append("image", thisFile);
-                formData.append("signedData", signResult.message);
-                formData.append("signature", signResult.signature);
-                formData.append("feature", featureId);
-
-                axios.post(apiHost + "/upload-image", formData).then ((res) => {
-                    if (res.data.status) {
-
-                        if (completeArtwork) {
-                            finishArt(artId).then(() => {
-                                alert("Artwork has been completed!");
-                            });
-
-                        } else {
-                            nextFeature(artId, featureEndTime).then((featureReceipt) => {
-                                alert ("Bidding for the next feature has started!");
-                                console.log(featureReceipt);
-                            });
-                        }
-                    } else {
-                        alert ("error uploading image");
-                        console.log (res.data);
-                    }
-                }).catch ((err) => {
-                    alert ("error uploading file: " + err);
-                });
-            });
+        controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, thisFile).then(receipt => {
+            //TODO choose correct message
+            alert("art has been finished or bidding for next feature has started");
+        }, err => {
+            alert(err.error);
+            console.log(err);
         });
     }
 
@@ -740,7 +763,7 @@ class ArtDisplay extends React.Component {
                 sc.events.ArtCreated().on('data', event => {
                     console.log("art created event");
                     console.log(event);
-                    //artPromise(event.returnValues.artId).then((artItem) => {
+                    //getArtDisplay(event.returnValues.artId).then((artItem) => {
                     //    thisComponent.setState({artList: thisComponent.state.artList.unshift(artItem)});
                     //});
                 });
