@@ -56,11 +56,21 @@ contract Site is Admin {
   Art[] art;
   Feature[] features;
   Bid[] bids;
+  uint64 fee;
 
   string testMessage;
 
   event FeatureCreated (uint64 featureId);
   event ArtCreated (uint64 artId);
+
+  // limit to admin
+  function setFee (uint64 _fee) public {
+    fee = _fee;
+  }
+
+  function getFee () public view returns (uint64) {
+    return fee;
+  }
 
   function isArtist () public view returns (bool) {
      return artists[msg.sender].enabled;
@@ -162,14 +172,15 @@ contract Site is Admin {
   // TODO make sure you can't bid on feature auctions that have ended
   function makeBid (uint64 artId, string memory _request) public payable returns (bool, string memory) {
     Art memory thisArt = art[artId];
+    uint actualBid = msg.value - fee;
     if (thisArt.currentFeatureId > -1) {
       Feature storage thisFeature = features[uint(thisArt.currentFeatureId)];
 
       if (thisFeature.currentBidId > -1) {
         Bid memory oldBid = bids[uint(thisFeature.currentBidId)];
 
-        if (msg.value > oldBid.amount) {
-          Bid memory newBid = Bid (thisFeature.currentBidId, msg.sender, msg.value, _request);
+        if (actualBid > oldBid.amount) {
+          Bid memory newBid = Bid (thisFeature.currentBidId, msg.sender, actualBid, _request);
           bids.push(newBid);
           thisFeature.currentBidId = int64(bids.length - 1);
           return (true, "You're now the top bidder!");
@@ -179,7 +190,7 @@ contract Site is Admin {
         }
 
       } else { // very first bid
-        Bid memory newBid = Bid (-1, msg.sender, msg.value, _request);
+        Bid memory newBid = Bid (-1, msg.sender, actualBid, _request);
         bids.push(newBid);
         thisFeature.currentBidId = int64(bids.length - 1);
         return (true, "You've made the very first bid!");
