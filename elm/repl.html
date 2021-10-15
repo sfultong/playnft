@@ -4,7 +4,6 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <script type="text/javascript" src="Main.min.js"></script>
     <script src="web3.min.js"></script>
     <script src="https://unpkg.com/@metamask/detect-provider/dist/detect-provider.min.js"></script>
     <script src="constants.js"></script>
@@ -17,59 +16,9 @@
     </style>
   </head>
   <body>
-    <div id="playNFT"></div>
-    <div id="testText"></div>
   </body>
   <script type="text/javascript">
-    var app = Elm.Main.init({
-      node: document.getElementById('playNFT')
-    });
-    
-    // const web3 = new Web3(constants.providerHost);
-    // console.log("web3");
-    // console.log(web3);
-    // const contract = new web3.eth.Contract(site, constants.contractAddress);
-    // console.log("contract");
-    // console.log(contract);
-    
-    // socket.addEventListener("message", function(event) {
-    //   app.ports.messageReceiver.send(event.data);
-    // });
-    
-    app.ports.sendMessage.subscribe(function(message) {
-        console.log(message)
-        siteContract.then(sc => {
-            sc.methods.getTestMessage().call().then((tm) => {
-            console.log(tm);
-            app.ports.messageReceiver.send(tm);
-            // app.ports.
-            // document.getElementById("testText").innerHTML = tm;
-            });
-        })
-    });
-    // // returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
-    // const getArtDisplay = function (i) { // i is the artId
-
-    app.ports.getArtDisplaySend.subscribe(function(artId) {
-        getArtDisplay(artId).then(x => {
-            app.ports.getArtDisplayReceiver.send(x);
-        });
         
-    });
-    app.ports.addArtistSend.subscribe(function(addr) {
-        addArtist(addr).then(x => {
-            app.ports.addArtistReceiver.send(true);
-        }).catch(x => {
-            app.ports.addArtistReceiver.send(false);
-        });
-    });
-    app.ports.getArtistSend.subscribe(function(addr) {
-        getArtist(addr).then(x => {
-            app.ports.getArtistReceiver.send(x);
-        });
-    });
-
-      
         // --- section for simple promises that are initialized once, and then never changed --------------------
     const web3 = new Promise ((resolve, reject) => {
         detectEthereumProvider().then((provider) => {
@@ -96,7 +45,6 @@
     });
 
     // --- section for Promise wrappers around web3 functions ----------------------
-    // Get all the art from all the artists (returns integer)
     const getNumArt = function () {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -104,7 +52,7 @@
             });
         });
     };
-    // Returns int
+
     const getNumArtists = function () {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -112,7 +60,7 @@
             });
         });
     };
-    // artId is an Int. Returns JSON {0:artist_address_string, 1:art_finished_bool, 2:art_currentFeatureId_int}
+
     const getArt = function (artId) {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -120,7 +68,7 @@
             });
         });
     };
-    // returns a JSON { 0:a_name_string, 1: a_description_string, 2:address_string}
+
     const getArtist = function (artistAddress) {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -128,15 +76,15 @@
             });
         });
     };
-    // returns a JSON {0:uint, 1:uint, 2:int64, 3:int64, 4:bool}
-    const getFeature = function (featureId) { // featureId : int
+
+    const getFeature = function (featureId) {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
                 sc.methods.getFeature(featureId).call().then(resolve);
             });
         });
     };
-    // returns -1 if art doesn't have a feature yet. returns featureId otherwise
+
     const getDisplayFeature = function (artId) {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -144,7 +92,7 @@
             });
         });
     };
-    // returns {0:int64, 1:address_payable_string, 2:uint, 3:string memory}
+
     const getBid = function (bidId) {
         return new Promise((resolve, reject) => {
             siteContract.then((sc) => {
@@ -464,7 +412,6 @@
     };
 
     // --- section for web3 event listeners --------------------------------
-    // These are just receivers (no send port)
     const registerArtCreatedListener = function (callback) {
         siteContract.then((sc) => {
             sc.events.ArtCreated().on('data', event => {

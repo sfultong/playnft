@@ -3,6 +3,7 @@ module Main exposing (main)
 import OutsideInfo exposing (..)
 import Date exposing (Date, day, month, weekday, year)
 import Dict exposing (Dict, empty, update, get)
+import Json.Decode exposing (Value)
 import Time exposing (Weekday(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -37,6 +38,7 @@ type alias Flags =
 
 type alias Model =
   { navKey : Navigation.Key
+  -- , getArtistSuccess : Maybe Bool
   , page : Page
   , navState : Navbar.State
   , artListings : ArtListingsDict
@@ -44,6 +46,7 @@ type alias Model =
   , today : Maybe Date
   , tabState : Tab.State
   , fromJavascript : String
+  , fromJSgetArtDisplayRecv : (Int, Maybe Value) -- (argument to JS getArtDisplay, {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId})
   , requestsDict : Dict Int String -- Int represent the artListing's id
   , requestsPaymentDict : Dict Int Int -- First Int represent the artListing's id, second represent payment
   }
@@ -59,8 +62,14 @@ type alias ArtistState =
   }
 
 type Msg
-  = TestMsg
+  = GetArtistReceiver Value
+  | GetArtistSend String
+  | AddArtistSend String
+  | TestMsg
+  | AddArtistReceiver Bool
   | Recv String
+  | GetArtDisplaySend Int
+  | GetArtDisplayRecv Int Value
   | UrlChange Url
   | ClickedLink UrlRequest
   | NavMsg Navbar.State
@@ -131,7 +140,7 @@ init flags url key =
                             --                 , title = ""
                             --                 , auctionEndDropdown = Dropdown.initialState
                             --                 }
-                            -- }
+                            -- }--
                             { navKey = key
                             , navState = navState
                             , page = ArtListingsInterface
@@ -141,6 +150,7 @@ init flags url key =
                             , fromJavascript = "some initial msg"
                             , requestsDict = empty
                             , requestsPaymentDict = empty
+                            , fromJSgetArtDisplayRecv = (0, Nothing) -- ¿TODO Maybe Int?
                             , artistState = { loggedArtist = Just { name = "hhefesto" }
                                             , artFile = Nothing
                                             , imagePreview = ""
@@ -163,6 +173,9 @@ subscriptions model = Sub.batch [ Navbar.subscriptions model.navState NavMsg
                                 , Tab.subscriptions model.tabState TabMsg
                                 , Alert.subscriptions model.artistState.newListingErrorVisibility PrepareListing
                                 , messageReceiver Recv
+                                , addArtistReceiver AddArtistReceiver
+                                , getArtistReceiver GetArtistReceiver
+                                , getArtDisplayReceiver << GetArtDisplayRecv  << Tuple.first <| model.fromJSgetArtDisplayRecv
                                 , Dropdown.subscriptions model.artistState.auctionEndDropdown AuctionEndDropdown
                                 ]
 
@@ -200,6 +213,11 @@ setAuctionEndDropdown sart s = { sart | auctionEndDropdown = s }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
+  GetArtistReceiver value -> (model, Cmd.none) -- TODO make model know about value
+  GetArtistSend addr -> (model, getArtistSend addr)
+  AddArtistReceiver bool -> (model, Cmd.none) -- TODO make it tell the model that addArtist was succesfull or not and alert user graphically
+  AddArtistSend addr -> (model, addArtistSend addr) -- TODO ¿should model change?
+  GetArtDisplaySend i -> (model, getArtDisplaySend i)
   SetRequest i mpayment mstr ->
     case (mpayment,mstr) of
       (Just payment, Just request) ->
@@ -209,6 +227,7 @@ update msg model = case msg of
           (True, str) -> ({model | artListings = addRequestToArtListingsDict i payment str model.artListings}, Cmd.none)
       (_,_) -> (model, Cmd.none) -- TODO: throw alert saying that a request or payment not specified
   --( , Cmd.none)
+  GetArtDisplayRecv i value -> ({ model | fromJSgetArtDisplayRecv = (i, Just value) }, Cmd.none)
   SetRequestPaymentDraft i str -> case str of
                             "" -> (model, Cmd.none)
                             _ -> case String.toInt str of
@@ -223,7 +242,10 @@ update msg model = case msg of
   SetAuctionDays i -> (setArtistState model <| setDate model.artistState <| Maybe.map (Date.add Date.Days i) model.today, Cmd.none)
   AuctionEndDropdown state -> (setArtistState model <| setAuctionEndDropdown model.artistState state, Cmd.none)
   Recv incoming -> ({model | fromJavascript = incoming }, Cmd.none)
+  -- GetArtDisplayRecv incoming ->
+
   TestMsg -> (model, sendMessage "something!!!!!!!!!!!!!!!!!!!!")
+  -- TestMsg -> (model, Cmd.none)
   TabMsg state ->
     ( { model | tabState = state }
     , Cmd.none
@@ -386,7 +408,7 @@ makePublicCardFromListing model artListingId artListing =
                             ]
                         , br [] []
                         , text "Your bid (ETH): "
-                        , input [ placeholder "amount in ETH"
+                        , input [ placeholder "amount in ETH (wei)"
                                 , style "margin" "10px"
                                 , onInput <| SetRequestPaymentDraft artListingId
                                 ]
@@ -596,6 +618,18 @@ pageArtListingsInterface model =
               , Button.attrs [ onClick TestMsg ]
               ]
               [ text "Test Msg" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| AddArtistSend "0xD01990F227CcBF0626E09F3B61Df1221B9b85841" ]
+              ]
+              [ text "Add Artist" ]
           ]
       ]
   , Grid.row []

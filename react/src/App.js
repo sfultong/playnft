@@ -337,7 +337,7 @@ const controlCompleteFeature = function (artId, featureId, completeArtwork, feat
 const controlStartArtWithFeature = function (featureEndTime, imageFile) {
     return new Promise((resolve, reject) => {
         web3.then ((w3) => {
-            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.getText()));
+            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.text()));
             startArtWithFeature().then((receipt) => {
                 const artId = receipt.events.ArtCreated.returnValues.artId;
                 const featureId = receipt.events.FeatureCreated.returnValues.featureId;
@@ -385,8 +385,6 @@ const getArtDisplay = function (i) { // i is the artId
 
                     } else if (currentFeatureId > -1) {
                         getFeature(currentFeatureId).then((feature) => {
-                            console.log("feature");
-                            console.log(feature);
                             const endTime = new Date(feature[1] * 1000);
                             const bidId = feature[3];
                             const timeText = "Bidding ending at " + endTime;
@@ -408,6 +406,22 @@ const getArtDisplay = function (i) { // i is the artId
     });
 };
 
+// --- section for web3 event listeners --------------------------------
+const registerArtCreatedListener = function (callback) {
+    siteContract.then((sc) => {
+        sc.events.ArtCreated().on('data', event => {
+            callback(event.returnValues.artId);
+        });
+    });
+};
+
+const registerFeatureCreatedListener = function (callback) {
+    siteContract.then((sc) => {
+        sc.events.FeatureCreated().on('data', event => {
+            callback(event.returnValues.featureId);
+        });
+    });
+};
 
 
 class MetaMaskButton extends React.Component {
@@ -759,15 +773,19 @@ class ArtDisplay extends React.Component {
             thisComponent.setState({artIds:artIds});
 
             // listen for new art to display
-            siteContract.then((sc) => {
-                sc.events.ArtCreated().on('data', event => {
-                    console.log("art created event");
-                    console.log(event);
-                    //getArtDisplay(event.returnValues.artId).then((artItem) => {
-                    //    thisComponent.setState({artList: thisComponent.state.artList.unshift(artItem)});
-                    //});
-                });
+            registerArtCreatedListener(artId => {
+                console.log("new art id " + artId);
+                var newList = thisComponent.state.artIds;
+                newList.unshift(artId);
+                thisComponent.setState({artIds: newList});
             });
+
+            registerFeatureCreatedListener(featureId => {
+                console.log("new feature id" + featureId);
+                // stupid force redraw
+                thisComponent.setState(thisComponent.state);
+            });
+            //TODO add NewBid event
         });
     }
 
