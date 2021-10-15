@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import OutsideInfo exposing (..)
 import Date exposing (Date, day, month, weekday, year)
 import DatePicker exposing (DateEvent(..), defaultSettings)
 import Time exposing (Weekday(..))
@@ -37,6 +38,7 @@ type alias Model =
   , artistState : ArtistState
   , today : Maybe Date
   , tabState : Tab.State
+  , fromJavascript : String
   }
 
 type alias ArtistState =
@@ -50,7 +52,9 @@ type alias ArtistState =
   }
 
 type Msg
-  = UrlChange Url
+  = TestMsg
+  | Recv String
+  | UrlChange Url
   | ClickedLink UrlRequest
   | NavMsg Navbar.State
   | PickFile
@@ -106,6 +110,7 @@ init flags url key =
                             , artListings = []
                             , today = Nothing
                             , tabState = Tab.initialState
+                            , fromJavascript = "some initial msg"
                             , artistState = { loggedArtist = Nothing
                                             , artFile = Nothing
                                             , imagePreview = ""
@@ -127,6 +132,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model = Sub.batch [ Navbar.subscriptions model.navState NavMsg
                                 , Tab.subscriptions model.tabState TabMsg
                                 , Alert.subscriptions model.artistState.newListingErrorVisibility PrepareListing
+                                , messageReceiver Recv
                                 ]
 
 setImagePreview : String -> ArtistState -> ArtistState
@@ -163,6 +169,8 @@ fromJust mx = case mx of
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
+  Recv incoming -> ({model | fromJavascript = incoming }, Cmd.none)
+  TestMsg -> (model, sendMessage "something!!!!!!!!!!!!!!!!!!!!")
   TabMsg state ->
     ( { model | tabState = state }
     , Cmd.none
@@ -242,7 +250,7 @@ routeParser = UrlParser.oneOf
   ]
 
 view : Model -> Browser.Document Msg
-view model = let _ = Debug.log "model!!!!!!!!!!!!!!!!!!!!!!!!!!!!1" model in
+view model = -- let _ = Debug.log "model!!!!!!!!!!!!!!!!!!!!!!!!!!!!1" model in
   { title = "playNFT"
   , body =
       [ div []
@@ -272,19 +280,6 @@ mainContent model = Grid.container [] <|
     AdminInterface -> pageAdminInterface model
     NotFound -> pageNotFound
 
-pageArtListingsInterface : Model -> List (Html Msg)
-pageArtListingsInterface model =
-  [ Grid.row []
-      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
-          [ br [] []
-          , h1 [] [ text "Art Listings" ]
-          , br [] []
-          ]
-      ]
-  , Grid.row []
-      [ Grid.col [] <| List.map makeCardFromListing model.artListings
-      ]
-  ]
 
 viewPreview : String -> Html msg
 viewPreview url = div
@@ -360,7 +355,15 @@ artistProfileTab model =
 
 artistNewArtListingTab : Model -> List (Html Msg)
 artistNewArtListingTab model =
-  [ h2 [] [ text model.artistState.title ]
+  [ Grid.row []
+      [ Grid.col [ ]
+          [ br [] []
+          , h2 [] [ if model.artistState.title == ""
+                      then text "Set a title for your new art listing."
+                      else text model.artistState.title
+                  ]
+          ]
+      ]
   , input [ placeholder "your art's tile", onInput SetTitle ] []
   , viewPreview model.artistState.imagePreview
   , Button.button
@@ -415,4 +418,28 @@ pageNotFound : List (Html Msg)
 pageNotFound =
   [ h1 [] [ text "Not found" ]
   , text "SOrry couldn't find that page"
+  ]
+
+
+
+pageArtListingsInterface : Model -> List (Html Msg)
+pageArtListingsInterface model =
+  [ Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          -- , h1 [] [ text "Art Listings" ]
+          , h1 [] [ text model.fromJavascript ]
+          , br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick TestMsg ]
+              ]
+              [ text "Test Msg" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [] <| List.map makeCardFromListing model.artListings
+      ]
   ]

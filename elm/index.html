@@ -14,27 +14,34 @@
     <style>
 
     </style>
-
-
-    <script>
-      window.onload = function () {
-          const web3 = new Web3(constants.providerHost);
-          console.log("web3");
-          console.log(web3);
-          const contract = new web3.eth.Contract(site, constants.contractAddress);
-          console.log("contract");
-          console.log(contract);
-          contract.methods.getTestMessage().call().then((tm) => {
-              document.getElementById("testText").innerHTML = tm;
-          });
-      };
-    </script>
   </head>
   <body>
     <div id="playNFT"></div>
+    <div id="testText"></div>
   </body>
   <script type="text/javascript">
     var app = Elm.Main.init({
       node: document.getElementById('playNFT')
+    });
+    
+    const web3 = new Web3(constants.providerHost);
+    console.log("web3");
+    console.log(web3);
+    const contract = new web3.eth.Contract(site, constants.contractAddress);
+    console.log("contract");
+    console.log(contract);
+    
+    // socket.addEventListener("message", function(event) {
+    //   app.ports.messageReceiver.send(event.data);
+    // });
+    
+    app.ports.sendMessage.subscribe(function(message) {
+        console.log(message)
+        contract.methods.getTestMessage().call().then((tm) => {
+            console.log(tm);
+            app.ports.messageReceiver.send(tm);
+            // app.ports.
+            // document.getElementById("testText").innerHTML = tm;
+        });
     });
   </script>
