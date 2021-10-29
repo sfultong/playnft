@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import OutsideInfo exposing (..)
 import Date exposing (Date, day, month, weekday, year)
+import Dict exposing (Dict, empty, update, get)
 import Time exposing (Weekday(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -11,6 +12,7 @@ import Browser exposing (UrlRequest)
 import Url exposing (Url)
 import Url.Parser as UrlParser exposing ((</>), Parser, s, top)
 import Bootstrap.Alert as Alert
+import Bootstrap.Badge as Badge
 import Bootstrap.Dropdown as Dropdown
 import Bootstrap.Navbar as Navbar
 import Bootstrap.Grid as Grid
@@ -20,9 +22,11 @@ import Bootstrap.Card as Card
 import Bootstrap.Form as Form
 import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
-import Bootstrap.ListGroup as Listgroup
+import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Tab as Tab
 import Bootstrap.Text as Text
+import Bootstrap.Form.Textarea as Textarea
+import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import File exposing (File)
 import File.Select as Select
@@ -35,11 +39,13 @@ type alias Model =
   { navKey : Navigation.Key
   , page : Page
   , navState : Navbar.State
-  , artListings : List ArtListing
+  , artListings : ArtListingsDict
   , artistState : ArtistState
   , today : Maybe Date
   , tabState : Tab.State
   , fromJavascript : String
+  , requestsDict : Dict Int String -- Int represent the artListing's id
+  , requestsPaymentDict : Dict Int Int -- First Int represent the artListing's id, second represent payment
   }
 
 type alias ArtistState =
@@ -68,8 +74,10 @@ type Msg
   | ReceiveDate Date
   | TabMsg Tab.State
   | AuctionEndDropdown Dropdown.State
-  | SetAuction2Days
-  | SetAuction1Day
+  | SetAuctionDays Int
+  | SetRequestDraft Int String
+  | SetRequestPaymentDraft Int String
+  | SetRequest Int (Maybe Int) (Maybe String)
 
 type alias ArtListing =
   { art : File
@@ -78,7 +86,7 @@ type alias ArtListing =
   , biddingEnding : Date
   , biddingStart : Date
   , artist : Artist
-  , petitions : List String
+  , requests : List (String, Int)
   }
 
 type alias Artist =
@@ -91,6 +99,8 @@ type Page
   | ArtistInterface
   | AdminInterface
   | NotFound
+
+type ArtListingsDict = ArtListingsDict (Dict Int ArtListing) -- Int represents id of ArtListing
 
 main : Program Flags Model Msg
 main = Browser.application
@@ -106,19 +116,37 @@ init : Flags -> Url -> Navigation.Key -> ( Model, Cmd Msg )
 init flags url key =
   let ( navState, navCmd ) = Navbar.initialState NavMsg
       ( model, urlCmd ) = urlUpdate url
+                            -- { navKey = key
+                            -- , navState = navState
+                            -- , page = ArtListingsInterface
+                            -- , artListings = []
+                            -- , today = Nothing
+                            -- , tabState = Tab.initialState
+                            -- , fromJavascript = "some initial msg"
+                            -- , artistState = { loggedArtist = Nothing
+                            --                 , artFile = Nothing
+                            --                 , imagePreview = ""
+                            --                 , selectedAuctionEndDate = Nothing
+                            --                 , newListingErrorVisibility = Alert.closed
+                            --                 , title = ""
+                            --                 , auctionEndDropdown = Dropdown.initialState
+                            --                 }
+                            -- }
                             { navKey = key
                             , navState = navState
                             , page = ArtListingsInterface
-                            , artListings = []
+                            , artListings = ArtListingsDict Dict.empty
                             , today = Nothing
                             , tabState = Tab.initialState
                             , fromJavascript = "some initial msg"
-                            , artistState = { loggedArtist = Nothing
+                            , requestsDict = empty
+                            , requestsPaymentDict = empty
+                            , artistState = { loggedArtist = Just { name = "hhefesto" }
                                             , artFile = Nothing
                                             , imagePreview = ""
                                             , selectedAuctionEndDate = Nothing
                                             , newListingErrorVisibility = Alert.closed
-                                            , title = ""
+                                            , title = "adjoints"
                                             , auctionEndDropdown = Dropdown.initialState
                                             }
                             }
@@ -155,8 +183,8 @@ setTitle sart str = { sart | title = str }
 
 setArtist : ArtistState -> String -> ArtistState
 setArtist sart str = if str == ""
-                       then { sart | loggedArtist = Nothing }
-                       else { sart | loggedArtist = Just { name = str } }
+                     then { sart | loggedArtist = Nothing }
+                     else { sart | loggedArtist = Just { name = str } }
 
 setArtFile : ArtistState -> File -> ArtistState
 setArtFile sart file = { sart | artFile = Just file }
@@ -172,8 +200,27 @@ setAuctionEndDropdown sart s = { sart | auctionEndDropdown = s }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
-  SetAuction1Day -> (setArtistState model <| setDate model.artistState <| Maybe.map (Date.add Date.Days 1) model.today, Cmd.none)
-  SetAuction2Days -> (setArtistState model <| setDate model.artistState <| Maybe.map (Date.add Date.Days 2) model.today, Cmd.none)
+  SetRequest i mpayment mstr ->
+    case (mpayment,mstr) of
+      (Just payment, Just request) ->
+        case (payment > 0, request) of
+          (False, _) -> (model, Cmd.none) -- TODO: throw alert saying that payment cannot be lower than 1
+          (True, "") -> (model, Cmd.none) -- TODO: throw alert saying that a request cannot be an empty string
+          (True, str) -> ({model | artListings = addRequestToArtListingsDict i payment str model.artListings}, Cmd.none)
+      (_,_) -> (model, Cmd.none) -- TODO: throw alert saying that a request or payment not specified
+  --( , Cmd.none)
+  SetRequestPaymentDraft i str -> case str of
+                            "" -> (model, Cmd.none)
+                            _ -> case String.toInt str of
+                                   Nothing -> (model, Cmd.none) -- TODO: throw alert saying int parse unsuccessful
+                                   Just payment ->
+                                     if payment < 0
+                                     then (model, Cmd.none) -- TODO: throw alert saying payment must be greater than 0
+                                     else ({model | requestsPaymentDict = Dict.update i (\x -> Just payment) model.requestsPaymentDict}, Cmd.none)
+  SetRequestDraft i str -> case str of
+                            "" -> (model, Cmd.none)
+                            _ -> ({model | requestsDict = Dict.update i (\x -> Just str) model.requestsDict}, Cmd.none)
+  SetAuctionDays i -> (setArtistState model <| setDate model.artistState <| Maybe.map (Date.add Date.Days i) model.today, Cmd.none)
   AuctionEndDropdown state -> (setArtistState model <| setAuctionEndDropdown model.artistState state, Cmd.none)
   Recv incoming -> ({model | fromJavascript = incoming }, Cmd.none)
   TestMsg -> (model, sendMessage "something!!!!!!!!!!!!!!!!!!!!")
@@ -181,7 +228,9 @@ update msg model = case msg of
     ( { model | tabState = state }
     , Cmd.none
     )
-  NewListing l -> ( { model | artListings = model.artListings ++ [l] }, Cmd.none )
+  NewListing l -> ( { model | artListings = addToArtListingsDict l model.artListings }
+                  , Cmd.none
+                  )
   ReceiveDate date -> ( { model | today = Just date }, Cmd.none)
   SetArtist str -> ( setArtistState model <| setArtist model.artistState str, Cmd.none )
   SetTitle str -> ( setArtistState model <| setTitle model.artistState str, Cmd.none )
@@ -202,7 +251,7 @@ update msg model = case msg of
                                 , biddingEnding = fromJust model.artistState.selectedAuctionEndDate
                                 , biddingStart = fromJust model.today
                                 , artist = fromJust model.artistState.loggedArtist
-                                , petitions = []
+                                , requests = []
                                 }
                             )
   GotPreview url -> ( setArtistState model <| setImagePreview url model.artistState -- { model | artistState = { model.artistState | imagePreview = url } }
@@ -282,16 +331,39 @@ viewPreview url = div
   ]
   []
 
-makeCardFromListing : ArtListing -> Html Msg
-makeCardFromListing artListing =
-  -- Card.config [ Card.outlinePrimary ]
-  --   |> Card.headerH4 [] [ text artListing.title ]
-  --   |> Card.imgTop [] [ viewPreview artListing.preview ]
-  --   |> Card.block []
-  --       [ Block.text [] [ text <| "Artist: " ++ artListing.artist.name ]
-  --       , Block.text [] [ text <| "Bidding ending at" ++ Date.toIsoString artListing.biddingEnding ]
-  --       ]
-  --   |> Card.view
+makeOwnerCardFromListing : ArtListing -> Html Msg
+makeOwnerCardFromListing artListing =
+  Card.config []
+    |> Card.header [ class "text-center" ]
+        [ img [ src artListing.preview
+              , style "max-width" "100%"
+              , style "height" "auto"
+              ]
+              []
+        , h3 [ Spacing.mt2 ] [ text artListing.title
+                             ]
+        ]
+    |> Card.block []
+        -- [ Block.text [] [ text <| "Artist: " ++ artListing.artist.name ]
+        [ Block.text [] [ text <| "Bidding ending at: " ++ Date.toIsoString artListing.biddingEnding ]
+        , Block.titleH4 [] [ text <| "Requests:" ]
+        , Block.custom <|
+            case artListing.requests of
+                [] -> ListGroup.ul
+                        [ ListGroup.li [] [text "No requests so far."] ]
+                ls -> ListGroup.ul <|
+                        List.map (\ (str,i) -> ListGroup.li
+                                                 [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter ] ]
+                                                 [ text str
+                                                 , Badge.pillSuccess [] [ text <| String.fromInt i ++ " wei (eth)" ]
+                                                 ]
+                                 )
+                                 artListing.requests -- TODO: show request and crypto amount
+        ]
+    |> Card.view
+
+makePublicCardFromListing : Model -> Int -> ArtListing -> Html Msg
+makePublicCardFromListing model artListingId artListing =
   Card.config []
     |> Card.header [ class "text-center" ]
         [ img [ src artListing.preview
@@ -305,6 +377,31 @@ makeCardFromListing artListing =
     |> Card.block []
         [ Block.text [] [ text <| "Artist: " ++ artListing.artist.name ]
         , Block.text [] [ text <| "Bidding ending at: " ++ Date.toIsoString artListing.biddingEnding ]
+        , Block.titleH4 [] [ text "Make a request:" ]
+        , Block.text [] [ text "Request: "
+                        , Textarea.textarea
+                            [ Textarea.id "myarea"
+                            , Textarea.rows 2
+                            , Textarea.onInput <| SetRequestDraft artListingId
+                            ]
+                        , br [] []
+                        , text "Your bid (ETH): "
+                        , input [ placeholder "amount in ETH"
+                                , style "margin" "10px"
+                                , onInput <| SetRequestPaymentDraft artListingId
+                                ]
+                                []
+                        , Button.button
+                            [ Button.primary
+                            -- , Button.large
+                            -- , Button.block
+                            , Button.attrs [ onClick <| SetRequest artListingId
+                                                                   (Dict.get artListingId model.requestsPaymentDict)
+                                                                   (Dict.get artListingId model.requestsDict)
+                                           ]
+                            ]
+                            [ text "New Request" ]
+                        ]
         ]
     |> Card.view
 
@@ -414,8 +511,8 @@ artistNewArtListingTab model =
                                       , toggleButton =
                                           Dropdown.toggle [ Button.primary ] [ text "Pick auction's duration" ]
                                       , items =
-                                          [ Dropdown.buttonItem [ onClick SetAuction1Day ] [ text "1 day" ]
-                                          , Dropdown.buttonItem [ onClick SetAuction2Days ] [ text "2 days" ]
+                                          [ Dropdown.buttonItem [ onClick <| SetAuctionDays 1 ] [ text "1 day" ]
+                                          , Dropdown.buttonItem [ onClick <| SetAuctionDays 2 ] [ text "2 days" ]
                                           ]
                                       }
                                   ]
@@ -452,8 +549,8 @@ pageAdminInterface model =
           ]
       ]
   , Grid.row []
-      [ Grid.col [ Col.md2 ] [ h4 [] [ text "Artist adress:" ] ]
-      , Grid.col [] [ input [ placeholder "your art's tile"
+      [ Grid.col [] [ h4 [] [ text "Artist's address:" ]
+                    , input [ placeholder "Your wallet's address"
                             , size 30
                             , style "margin" "10px"
                             ]
@@ -461,6 +558,17 @@ pageAdminInterface model =
                     , Button.button [] [ text "Submit" ]
                     ]
       ]
+
+  -- , Grid.row []
+  --     [ Grid.col [ Col.md2 ] [ h4 [] [ text "Artist adress:" ] ]
+  --     , Grid.col [] [ input [ placeholder "your art's tile"
+  --                           , size 30
+  --                           , style "margin" "10px"
+  --                           ]
+  --                       []
+  --                   , Button.button [] [ text "Submit" ]
+  --                   ]
+  --     ]
   ]
 
 pageNotFound : List (Html Msg)
@@ -472,7 +580,7 @@ pageNotFound =
 intersperseBr : List (Html Msg) -> List (Html Msg)
 intersperseBr lst = case lst of
   [] -> []
-  (l::ls) -> [l, br [] []] ++ intersperseBr ls
+  (l::ls) -> [br [] [], l] ++ intersperseBr ls
 
 pageArtListingsInterface : Model -> List (Html Msg)
 pageArtListingsInterface model =
@@ -491,17 +599,41 @@ pageArtListingsInterface model =
           ]
       ]
   , Grid.row []
-      [ Grid.col [] <| List.append [br [] [] ] <| intersperseBr <| List.map makeCardFromListing model.artListings
+      [ Grid.col [] << List.append [br [] [] ]
+                    << intersperseBr
+                    << Dict.values
+                    << Dict.map (makePublicCardFromListing model)
+                    << getArtListingsDict
+                    <| model.artListings
       ]
   ]
 
 artistListingsTab : Model -> List (Html Msg)
 artistListingsTab model =
   [ Grid.row[]
-      [ Grid.col [] <| intersperseBr <|List.map makeCardFromListing <|
+      [ Grid.col [] <| intersperseBr <| List.map makeOwnerCardFromListing <|
           case model.artistState.loggedArtist of
             Nothing -> []
-            Just artist -> List.filter (\a -> a.artist.name == artist.name) model.artListings
-
+            Just artist -> Dict.values << Dict.filter (\k a -> a.artist.name == artist.name)
+                                       <| getArtListingsDict model.artListings
       ]
   ]
+
+getArtListingsDict : ArtListingsDict -> Dict Int ArtListing
+getArtListingsDict (ArtListingsDict d) = d
+
+addToArtListingsDict : ArtListing -> ArtListingsDict -> ArtListingsDict
+addToArtListingsDict artListing (ArtListingsDict artListingsDict) =
+  let nextId = case List.maximum << Dict.keys <| artListingsDict of
+                 Nothing -> 0
+                 Just x -> x + 1
+  in ArtListingsDict << Dict.insert nextId artListing <| artListingsDict
+
+addRequestToArtListingsDict : Int -> Int -> String -> ArtListingsDict -> ArtListingsDict
+addRequestToArtListingsDict idArtListing payment request (ArtListingsDict artListingsDict) =
+  let addRequest : Maybe ArtListing -> Maybe ArtListing
+      addRequest mal =
+        case mal of
+          Nothing -> Nothing
+          Just al -> Just { al | requests = al.requests ++ [(request,payment)] }
+  in ArtListingsDict <| Dict.update idArtListing addRequest artListingsDict
