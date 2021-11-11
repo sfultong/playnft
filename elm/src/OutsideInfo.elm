@@ -14,3 +14,4 @@ port addArtistReceiver : (Bool -> msg) -> Sub msg
 
 port getArtistSend : String -> Cmd msg
 port getArtistReceiver : (Value -> msg) -> Sub msg
+port getArtistErrorReceiver : (Value -> msg) -> Sub msg

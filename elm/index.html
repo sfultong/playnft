@@ -57,15 +57,17 @@
         
     });
     app.ports.addArtistSend.subscribe(function(addr) {
-        addArtist(addr).then(x => {
+        addArtist(addr).then(_ => {
             app.ports.addArtistReceiver.send(true);
-        }).catch(x => {
+        }).catch(_ => {
             app.ports.addArtistReceiver.send(false);
         });
     });
     app.ports.getArtistSend.subscribe(function(addr) {
         getArtist(addr).then(x => {
             app.ports.getArtistReceiver.send(x);
+        }).catch(y => {
+            app.ports.getArtistErrorReceiver.send(y);
         });
     });
 

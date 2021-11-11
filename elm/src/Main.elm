@@ -38,6 +38,8 @@ type alias Flags =
 
 type alias Model =
   { navKey : Navigation.Key
+  , getArtistError : Maybe Value
+  , addArtistReceiverState : Maybe Bool
   -- , getArtistSuccess : Maybe Bool
   , page : Page
   , navState : Navbar.State
@@ -63,6 +65,7 @@ type alias ArtistState =
 
 type Msg
   = GetArtistReceiver Value
+  | GetArtistErrorReceiver Value
   | GetArtistSend String
   | AddArtistSend String
   | TestMsg
@@ -151,6 +154,8 @@ init flags url key =
                             , requestsDict = empty
                             , requestsPaymentDict = empty
                             , fromJSgetArtDisplayRecv = (0, Nothing) -- ¿TODO Maybe Int?
+                            , getArtistError = Nothing
+                            , addArtistReceiverState = Nothing
                             , artistState = { loggedArtist = Just { name = "hhefesto" }
                                             , artFile = Nothing
                                             , imagePreview = ""
@@ -175,6 +180,7 @@ subscriptions model = Sub.batch [ Navbar.subscriptions model.navState NavMsg
                                 , messageReceiver Recv
                                 , addArtistReceiver AddArtistReceiver
                                 , getArtistReceiver GetArtistReceiver
+                                , getArtistErrorReceiver GetArtistErrorReceiver
                                 , getArtDisplayReceiver << GetArtDisplayRecv  << Tuple.first <| model.fromJSgetArtDisplayRecv
                                 , Dropdown.subscriptions model.artistState.auctionEndDropdown AuctionEndDropdown
                                 ]
@@ -213,9 +219,10 @@ setAuctionEndDropdown sart s = { sart | auctionEndDropdown = s }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
+  GetArtistErrorReceiver value -> ({ model |  getArtistError = Just value }, Cmd.none)
   GetArtistReceiver value -> (model, Cmd.none) -- TODO make model know about value
   GetArtistSend addr -> (model, getArtistSend addr)
-  AddArtistReceiver bool -> (model, Cmd.none) -- TODO make it tell the model that addArtist was succesfull or not and alert user graphically
+  AddArtistReceiver bool -> ({ model | addArtistReceiverState = Just bool}, Cmd.none) -- TODO alert user graphically
   AddArtistSend addr -> (model, addArtistSend addr) -- TODO ¿should model change?
   GetArtDisplaySend i -> (model, getArtDisplaySend i)
   SetRequest i mpayment mstr ->
