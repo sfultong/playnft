@@ -54,7 +54,6 @@
         getArtDisplay(artId).then(x => {
             app.ports.getArtDisplayReceiver.send(x);
         });
-        
     });
     app.ports.addArtistSend.subscribe(function(addr) {
         addArtist(addr).then(_ => {
@@ -64,14 +63,146 @@
         });
     });
     app.ports.getArtistSend.subscribe(function(addr) {
-        getArtist(addr).then(x => {
+        console.log("HERE!!!!!!!!") // this does trigger
+        try
+        {getArtist(addr).then(x => {
+            console.log("THEN HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             app.ports.getArtistReceiver.send(x);
-        }).catch(y => {
+        }).catch(y => { // CATCH doesn't fire when provided a wrong addr and THEN also wasn't triggered. Throws "Uncaught (in promise) Error: bad address checksum". TODO: FIX
+            console.log("CATCH HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             app.ports.getArtistErrorReceiver.send(y);
+        }).finally(x => { console.log("FINALLY HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");});
+        }catch (y){console.log("TRY HERE!!!!!!!!!!!!!!!!!!!!!")} // Also doesn't trigger. TODO Fix
+        });
+      
+    // function getNumArt () public view returns (uint) {
+    app.ports.getNumArtSend.subscribe(function() {
+        getNumArt().then(x => {
+            aux = parseInt(x)
+            if(isNaN(aux)){
+                app.ports.getNumArtReceiver.send(-1);
+            }else {
+                app.ports.getNumArtReceiver.send(aux);
+            }
+        }).catch(y => {
+            console.log(y);
+            app.ports.getNumArtReceiver.send(-1);
         });
     });
 
+    // function getNumArtist () public view returns (uint) {
+    app.ports.getNumArtistSend.subscribe(function() {
+        getNumArtists().then(x => {
+            aux = parseInt(x)
+            if(isNaN(aux)){
+                app.ports.getNumArtistReceiver.send(-1);
+            }else {
+                app.ports.getNumArtistReceiver.send(aux);
+            }
+        }).catch(y => {
+            console.log(y);
+            app.ports.getNumArtistReceiver.send(-1);
+        });
+    });
+
+    // function getArt (uint i) public view returns (address, bool, int64) {
+    app.ports.getArtSend.subscribe(function(artId) {
+        
+        getArt(artId).then(x => {
+            app.ports.getArtReceiver.send(x);
+        }).catch(x =>{
+            console.log("¡¡¡¡¡¡¡¡¡¡¡This will wrongfully never be triggered!!!!!!!!!!!!!!!"); // Also unable to catch. See getArtistSend. TODO Fix
+        });
+    });
+
+    // function getFeature (uint64 featureId) public view returns (uint, uint, int64, int64, bool) {
+    app.ports.getFeatureSend.subscribe(function(artId) {
+        
+        getFeature(artId).then(x => {
+            
+            app.ports.getFeatureReceiver.send(x);
+        }).catch(x =>{
+            console.log("¡¡¡¡¡¡¡¡¡¡¡This will wrongfully never be triggered!!!!!!!!!!!!!!!"); // Also unable to catch. See getArtistSend. TODO Fix
+        });
+    });
       
+    // function getDisplayFeature (uint16 artId) public view returns (int64) {
+    app.ports.getDisplayFeatureSend.subscribe(function(artId) {
+        
+        getDisplayFeature(artId).then(x => {
+            aux = parseInt(x)
+            if(isNaN(aux)){
+                app.ports.getDisplayFeatureReceiver.send(-1);
+            }else {
+                app.ports.getDisplayFeatureReceiver.send(aux);
+            }
+            
+        }).catch(x =>{
+            console.log("¡¡¡¡¡¡¡¡¡¡¡This will wrongfully never be triggered!!!!!!!!!!!!!!!"); // Also unable to catch. See getArtistSend. TODO Fix
+        });
+    });
+    
+    // function getBid (uint64 bidId) public view returns (int64, address payable, uint, string memory) {
+    app.ports.getBidSend.subscribe(function(bidId) {
+        
+        getBid(bidId).then(x => {
+            
+            app.ports.getBidReceiver.send(x);
+        }).catch(x =>{
+            console.log("¡¡¡¡¡¡¡¡¡¡¡This will wrongfully never be triggered!!!!!!!!!!!!!!!"); // Also unable to catch. See getArtistSend. TODO Fix
+        });
+    });
+
+    // function modifyArtistProfile (string memory _name, string memory _description) public {
+    app.ports.modifyArtistProfileSend.subscribe(function(args) {
+        var [name, description] = args;
+        modifyArtistProfile(name, description).then(_ => {
+            app.ports.modifyArtistProfileReceiver.send(true);
+        }).catch(_ => {
+            app.ports.modifyArtistProfileReceiver.send(false);
+        });
+    });
+    // function startArtWithFeature () public {
+    app.ports.startArtWithFeatureSend.subscribe(_ => {
+        startArtWithFeature().then(_ => {
+            app.ports.startArtWithFeatureReceiver.send(true);
+        }).catch(_ => {
+            app.ports.startArtWithFeatureReceiver.send(false);
+        });
+    });
+    // function startFeature (uint64 artId, uint _endTime) public {
+    app.ports.startFeatureSend.subscribe(args => {
+        var [artId, endTimeInt] = args;
+        startFeature(artId, endTimeInt).then(_ => {
+            app.ports.startFeatureReceiver.send(true);
+        }).catch(_ => {
+            app.ports.startFeatureReceiver.send(false);
+        });
+    });
+    // function makeBid (uint64 artId, string memory _request) public payable returns (bool, string memory) {
+    app.ports.makeBidSend.subscribe(args => {
+        var [artId, request] = args;
+        makeBid(artId, request).then(x => {
+            app.ports.makeBidReceiver.send(x);
+        });
+    });
+    // function nextFeature (uint64 artId, uint endTime) public {
+    app.ports.nextFeatureSend.subscribe(args => {
+        var [artId, endTimeInt] = args;
+        nextFeature(artId, endTimeInt).then(_ => {
+            app.ports.nextFeatureReceiver.send(true);
+        }).catch(_ => {
+            app.ports.nextFeatureReceiver.send(false);
+        });
+    });
+    // function finishArt (uint64 artId) public {
+    app.ports.finishArtSend.subscribe(artId => {
+        finishArt(artId).then(_ => {
+            app.ports.finishArtReceiver.send(true);
+        }).catch(_ => {
+            app.ports.finishArtReceiver.send(false);
+        });
+    });
         // --- section for simple promises that are initialized once, and then never changed --------------------
     const web3 = new Promise ((resolve, reject) => {
         detectEthereumProvider().then((provider) => {
@@ -342,7 +473,7 @@
                                 if (err) {
                                     reject(err);
                                 } else {
-                                    resolve({message: msgParams, signature: result.result});
+                                    resolve({message: msgParams, signature: result.result}); // TODO: Ask what are the types of msgParams and resutl.result
                                 }
                             }
                         );
@@ -355,6 +486,7 @@
     // --- section for component control methods ------------------------------------------
 
     // returns solidity receipt for finishArt or nextFeature
+    // returns JSON Value
     const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageFile) {
         return new Promise((resolve, reject) => {
             web3.then ((w3) => {
@@ -393,6 +525,7 @@
 
     // TODO should probably utilize controlCompleteFeature
     // returns solidity receipt for startFeature
+    // returns JSON Value
     const controlStartArtWithFeature = function (featureEndTime, imageFile) {
         return new Promise((resolve, reject) => {
             web3.then ((w3) => {
@@ -467,6 +600,7 @@
 
     // --- section for web3 event listeners --------------------------------
     // These are just receivers (no send port)
+    // This returns artId (int)
     const registerArtCreatedListener = function (callback) {
         siteContract.then((sc) => {
             sc.events.ArtCreated().on('data', event => {
@@ -474,7 +608,7 @@
             });
         });
     };
-
+    // This returns featureId (int)
     const registerFeatureCreatedListener = function (callback) {
         siteContract.then((sc) => {
             sc.events.FeatureCreated().on('data', event => {

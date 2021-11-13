@@ -38,6 +38,21 @@ type alias Flags =
 
 type alias Model =
   { navKey : Navigation.Key
+  , registerFeatureCreatedListenerList : List Int
+  , registerArtCreatedListenerList : List Int
+  , finishArt : Maybe Bool
+  , nextFeature : Maybe Bool
+  , makeBid : Maybe Value
+  , startFeature : Maybe Bool
+  , startArtWithFeature : Maybe Bool
+  , modifyArtistProfile : Maybe Bool
+  , getBid : Maybe Value
+  , getDisplayFeature : Maybe Int
+  , getFeature : Maybe Value
+  , getArt : Maybe Value
+  , getNumArtist : Maybe Int
+  , getNumArt : Maybe Int
+  , getArtist : Maybe Value
   , getArtistError : Maybe Value
   , addArtistReceiverState : Maybe Bool
   -- , getArtistSuccess : Maybe Bool
@@ -64,7 +79,33 @@ type alias ArtistState =
   }
 
 type Msg
-  = GetArtistReceiver Value
+  = GetNumArtistReceiver Int
+  | GetNumArtistSend
+  | RegisterFeatureCreatedListener Int
+  | RegisterArtCreatedListener Int
+  | FinishArtReceiver Bool
+  | FinishArtSend Int
+  | NextFeatureReceiver Bool
+  | NextFeatureSend (Int, Int)
+  | MakeBidReceiver Value
+  | MakeBidSend (Int, String)
+  | StartFeatureReceiver Bool
+  | StartFeatureSend (Int, Int)
+  | StartArtWithFeatureReceiver Bool
+  | StartArtWithFeatureSend
+  | ModifyArtistProfileReceiver Bool
+  | ModifyArtistProfileSend (String, String)
+  | GetBidReceiver Value
+  | GetBidSend Int
+  | GetDisplayFeatureReceiver Int
+  | GetDisplayFeatureSend Int
+  | GetFeatureReceiver Value
+  | GetFeatureSend Int
+  | GetArtReceiver Value
+  | GetArtSend Int
+  | GetNumArtSend
+  | GetNumArtReceiver Int
+  | GetArtistReceiver Value
   | GetArtistErrorReceiver Value
   | GetArtistSend String
   | AddArtistSend String
@@ -156,6 +197,21 @@ init flags url key =
                             , fromJSgetArtDisplayRecv = (0, Nothing) -- ¿TODO Maybe Int?
                             , getArtistError = Nothing
                             , addArtistReceiverState = Nothing
+                            , getArtist = Nothing
+                            , getNumArt = Nothing
+                            , getNumArtist = Nothing
+                            , getArt = Nothing
+                            , getFeature = Nothing
+                            , getDisplayFeature = Nothing
+                            , getBid = Nothing
+                            , modifyArtistProfile = Nothing
+                            , startArtWithFeature = Nothing
+                            , startFeature = Nothing
+                            , makeBid = Nothing
+                            , nextFeature = Nothing
+                            , finishArt = Nothing
+                            , registerArtCreatedListenerList = []
+                            , registerFeatureCreatedListenerList = []
                             , artistState = { loggedArtist = Just { name = "hhefesto" }
                                             , artFile = Nothing
                                             , imagePreview = ""
@@ -178,9 +234,23 @@ subscriptions model = Sub.batch [ Navbar.subscriptions model.navState NavMsg
                                 , Tab.subscriptions model.tabState TabMsg
                                 , Alert.subscriptions model.artistState.newListingErrorVisibility PrepareListing
                                 , messageReceiver Recv
+                                , getBidReceiver GetBidReceiver
+                                , getDisplayFeatureReceiver GetDisplayFeatureReceiver
+                                , getFeatureReceiver GetFeatureReceiver
+                                , getArtReceiver GetArtReceiver
+                                , getNumArtistReceiver GetNumArtistReceiver
+                                , getNumArtReceiver GetNumArtReceiver
                                 , addArtistReceiver AddArtistReceiver
                                 , getArtistReceiver GetArtistReceiver
                                 , getArtistErrorReceiver GetArtistErrorReceiver
+                                , modifyArtistProfileReceiver ModifyArtistProfileReceiver
+                                , startArtWithFeatureReceiver StartArtWithFeatureReceiver
+                                , startFeatureReceiver StartFeatureReceiver
+                                , makeBidReceiver MakeBidReceiver
+                                , nextFeatureReceiver NextFeatureReceiver
+                                , finishArtReceiver FinishArtReceiver
+                                , registerArtCreatedListener RegisterArtCreatedListener
+                                , registerFeatureCreatedListener RegisterFeatureCreatedListener
                                 , getArtDisplayReceiver << GetArtDisplayRecv  << Tuple.first <| model.fromJSgetArtDisplayRecv
                                 , Dropdown.subscriptions model.artistState.auctionEndDropdown AuctionEndDropdown
                                 ]
@@ -219,8 +289,38 @@ setAuctionEndDropdown sart s = { sart | auctionEndDropdown = s }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = case msg of
+  RegisterFeatureCreatedListener i -> ({ model | registerFeatureCreatedListenerList  = i :: model.registerFeatureCreatedListenerList }
+                                      , Cmd.none
+                                      )
+  RegisterArtCreatedListener i -> ({ model | registerArtCreatedListenerList  = i :: model.registerArtCreatedListenerList }
+                                  , Cmd.none
+                                  )
+  FinishArtReceiver bool -> ({ model | finishArt = Just bool}, Cmd.none)
+  FinishArtSend i -> (model, finishArtSend i)
+  NextFeatureReceiver bool -> ({ model | nextFeature = Just bool}, Cmd.none)
+  NextFeatureSend pair -> (model, nextFeatureSend pair)
+  MakeBidReceiver value -> ({ model | makeBid = Just value}, Cmd.none)
+  MakeBidSend pair -> (model, makeBidSend pair)
+  StartFeatureReceiver bool -> ({ model | startFeature = Just bool}, Cmd.none)
+  StartFeatureSend int_pair -> (model, startFeatureSend int_pair)
+  StartArtWithFeatureSend -> (model, startArtWithFeatureSend ())
+  StartArtWithFeatureReceiver bool -> ({ model | startArtWithFeature = Just bool}, Cmd.none)
+  ModifyArtistProfileSend string_pair -> (model, modifyArtistProfileSend string_pair)
+  ModifyArtistProfileReceiver bool -> ({ model | modifyArtistProfile = Just bool}, Cmd.none)
+  GetBidReceiver value -> ({ model | getBid = Just value }, Cmd.none)
+  GetBidSend i -> (model, getBidSend i)
+  GetDisplayFeatureReceiver i -> ({ model | getDisplayFeature = Just i }, Cmd.none)
+  GetDisplayFeatureSend i -> (model, getDisplayFeatureSend i)
+  GetFeatureReceiver value -> ({ model | getFeature = Just value }, Cmd.none)
+  GetFeatureSend i -> (model, getFeatureSend i)
+  GetArtReceiver value -> ({ model | getArt = Just value }, Cmd.none)
+  GetArtSend i -> (model, getArtSend i)
+  GetNumArtistSend -> (model, getNumArtistSend ())
+  GetNumArtistReceiver i -> ({ model | getNumArtist = Just i }, Cmd.none)
+  GetNumArtSend -> (model, getNumArtSend ())
+  GetNumArtReceiver i -> ({ model | getNumArt = Just i }, Cmd.none)
   GetArtistErrorReceiver value -> ({ model |  getArtistError = Just value }, Cmd.none)
-  GetArtistReceiver value -> (model, Cmd.none) -- TODO make model know about value
+  GetArtistReceiver value -> ({ model | getArtist = Just value }, Cmd.none) -- TODO make model know about value
   GetArtistSend addr -> (model, getArtistSend addr)
   AddArtistReceiver bool -> ({ model | addArtistReceiverState = Just bool}, Cmd.none) -- TODO alert user graphically
   AddArtistSend addr -> (model, addArtistSend addr) -- TODO ¿should model change?
@@ -318,7 +418,7 @@ routeParser = UrlParser.oneOf
   ]
 
 view : Model -> Browser.Document Msg
-view model = let _ = Debug.log "model!!!!!!!!!!!!!!!!!!!!!!!!!!!!1" model in
+view model = let _ = Debug.log "Model" model in
   { title = "playNFT"
   , body =
       [ div []
@@ -637,6 +737,163 @@ pageArtListingsInterface model =
               , Button.attrs [ onClick <| AddArtistSend "0xD01990F227CcBF0626E09F3B61Df1221B9b85841" ]
               ]
               [ text "Add Artist" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              -- , Button.attrs [ onClick <| GetArtistSend "0xD01990F227CcBF0626E09F3B61Df1221B9b85841" ] -- success
+              , Button.attrs [ onClick <| GetArtistSend "0xD01990F227CcBF0626E09F3B61Df1221B9b85840" ] -- error, but doesn't work TODO: FIX. See: app.ports.getArtistSend.subscribe(function(addr) {
+              ]
+              [ text "Get Artist" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetNumArtSend ] -- success
+              ]
+              [ text "getNumArt" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetNumArtistSend ] -- success
+              ]
+              [ text "getNumArtist" ]
+          ]
+      ]
+   , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetArtSend 0 ] -- success
+              ]
+              [ text "getArt" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetFeatureSend 0 ]
+              ]
+              [ text "getFeature" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetDisplayFeatureSend 0 ]
+              ]
+              [ text "getDisplayFeature" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| GetBidSend 0 ]
+              ]
+              [ text "getBid" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| ModifyArtistProfileSend ("string0", "string1") ]
+              ]
+              [ text "modifyArtistProfile" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| StartArtWithFeatureSend ]
+              ]
+              [ text "startArtWithFeature" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| StartFeatureSend (0,0) ]
+              ]
+              [ text "startFeature" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| MakeBidSend (0,"a-string") ]
+              ]
+              [ text "makeBid" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| NextFeatureSend (0,0) ]
+              ]
+              [ text "nextFeature" ]
+          ]
+      ]
+  , Grid.row []
+      [ Grid.col [ Col.textAlign Text.alignXsCenter ]
+          [ br [] []
+          , Button.button
+              [ Button.secondary
+              , Button.large
+              , Button.block
+              , Button.attrs [ onClick <| FinishArtSend 0 ]
+              ]
+              [ text "finishArt" ]
           ]
       ]
   , Grid.row []
