@@ -4,6 +4,8 @@ const fileUpload = require('express-fileupload');
 const cors = require("cors");
 const Web3 = require("web3");
 const web3 = new Web3("http://localhost:8545"); //TODO parameterize provider
+const fs = require('fs');
+
 require("dotenv").config();
 
 const app = express();
@@ -32,7 +34,7 @@ app.get("/", (req, res) => {
 
 app.post('/upload-image', async (req, res) => {
     try {
-        if(!req.files) {
+        if(!req.body.imageData) {
             res.send({
                 status: false,
                 message: 'File not uploaded'
@@ -54,21 +56,22 @@ app.post('/upload-image', async (req, res) => {
                     message: 'invalid signature   '
                 });
             } else {
-                //Use the name of the input field (i.e. "avatar") to retrieve the uploaded file
-                const image = req.files.image;
-
-                //Use the mv() method to place the file in upload directory (i.e. "uploads")
-                image.mv('./images/' + req.body.feature + '.png');
+                const imageData = req.body.imageData.replace(/[^,]*,/, ''); // cut off encoding prefix
+                const buff = new Buffer(imageData, 'base64');
+                const fileName = './images/' + req.body.feature + '.png';
+                fs.writeFileSync(fileName, buff);
 
                 //send response
                 res.send({
                     status: true,
                     message: 'File is uploaded',
+                    /*
                     data: {
                         name: image.name,
                         mimetype: image.mimetype,
                         size: image.size
                     }
+                    */
                 });
             }
 

@@ -296,14 +296,14 @@ const signFeatureImage = function (featureId, imageHash) {
 // --- section for component control methods ------------------------------------------
 
 // returns solidity receipt for finishArt or nextFeature
-const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageFile) {
+const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageData) {
     return new Promise((resolve, reject) => {
         web3.then ((w3) => {
-            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.text()));
+            const imageHash = w3.utils.sha3(imageData);
 
             signFeatureImage(featureId, imageHash).then((signResult) => {
                 const formData = new FormData();
-                formData.append("image", imageFile);
+                formData.append("imageData", imageData);
                 formData.append("signedData", signResult.message);
                 formData.append("signature", signResult.signature);
                 formData.append("feature", featureId);
@@ -332,38 +332,18 @@ const controlCompleteFeature = function (artId, featureId, completeArtwork, feat
     });
 };
 
-// TODO should probably utilize controlCompleteFeature
 // returns solidity receipt for startFeature
-const controlStartArtWithFeature = function (featureEndTime, imageFile) {
+const controlStartArtWithFeature = function (featureEndTime, imageData) {
     return new Promise((resolve, reject) => {
-        web3.then ((w3) => {
-            const imageHash = w3.utils.sha3(encodeURIComponent(imageFile.text()));
-            startArtWithFeature().then((receipt) => {
-                const artId = receipt.events.ArtCreated.returnValues.artId;
-                const featureId = receipt.events.FeatureCreated.returnValues.featureId;
+        startArtWithFeature().then((receipt) => {
 
-                signFeatureImage(featureId, imageHash).then((signResult) => {
-                    const formData = new FormData();
-                    formData.append("image", imageFile);
-                    formData.append("signedData", signResult.message);
-                    formData.append("signature", signResult.signature);
-                    formData.append("feature", featureId);
+            const artId = receipt.events.ArtCreated.returnValues.artId;
+            const featureId = receipt.events.FeatureCreated.returnValues.featureId;
 
-                    axios.post(apiHost + "/upload-image", formData).then ((res) => {
-                        if (res.data.status) {
-                            startFeature(artId, featureEndTime).then((featureReceipt) => {
-                                resolve(receipt);
-                            });
-                        } else {
-                            reject({error: "problem uploading image", result:res});
-                        }
-                    }).catch ((err) => {
-                        reject({error: "problem signing/posting image", result:err});
-                    });
-                });
-            });
+            controlCompleteFeature(artId, featureId, false, featureEndTime, imageData).then(receipt => {
+                resolve(receipt);
+            }).catch (err => reject(err));
         });
-
     });
 };
 
@@ -593,16 +573,22 @@ class ArtistInterface extends React.Component {
     async handleSubmit () {
         const thisFile = this.state.file;
         const featureEndTime = this.state.featureEndTime;
+        const reader = new FileReader();
 
         if (! thisFile) {
             alert ("no file");
         } else {
-            controlStartArtWithFeature(featureEndTime, thisFile).then(receipt => {
-                alert("new art created");
-            }, err => {
-                alert(err.error);
-                console.log(err);
-            });
+            reader.readAsDataURL(thisFile);
+            reader.onloadend = function() {
+                const imageData = reader.result;
+
+                controlStartArtWithFeature(featureEndTime, imageData).then(receipt => {
+                    alert("new art created");
+                }, err => {
+                    alert(err.error);
+                    console.log(err);
+                });
+            };
         }
     }
 
@@ -700,13 +686,18 @@ class ArtListing extends React.Component {
         const completeArtwork = this.state.completeArtwork;
         const featureEndTime = this.state.featureEndTime;
 
-        controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, thisFile).then(receipt => {
-            //TODO choose correct message
-            alert("art has been finished or bidding for next feature has started");
-        }, err => {
-            alert(err.error);
-            console.log(err);
-        });
+        const reader = new FileReader();
+        reader.readAsDataURL(thisFile);
+        reader.onloadend = function () {
+            const imageData = reader.result;
+            controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, imageData).then(receipt => {
+                //TODO choose correct message
+                alert("art has been finished or bidding for next feature has started");
+            }, err => {
+                alert(err.error);
+                console.log(err);
+            });
+        };
     }
 
     render () {
