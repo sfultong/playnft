@@ -9,8 +9,7 @@ in
       project = "playnft";
       serviceAccount = "playnft@playnft.iam.gserviceaccount.com";
       accessKey = "~/.ssh/playnft-ff466b4265ae.json";
-
-      region = "us-west2-b";
+      region = "us-east1-b";
       instanceType = "g1-small";
       scheduling.automaticRestart = true;
       scheduling.onHostMaintenance = "MIGRATE";
@@ -19,20 +18,33 @@ in
       rootDiskSize = 30;
     };
   };
+  # systemd.services.playNFTfrontend =
+  #     { description = "playNFT's frontend";
+  #       enable = true;
+  #       wantedBy = [ "multi-user.target" "nginx.service" ];
+  #       after = [ "network.service" "local-fs.target" ];
+  #       serviceConfig = {
+  #         Type = "simple";
+  #         User = "root";
+  #         ExecStart = ''${pkgs.playNFTfrontend}/bin/muellshack'';
+  #         ExecStop = "";
+  #         Restart = "always";
+  #       };
+  #     };
 
-  systemd.services.muellshack =
-      { description = "muellshack";
-        enable = true;
-        wantedBy = [ "multi-user.target" "nginx.service" ];
-        after = [ "network.service" "local-fs.target" ];
-        serviceConfig = {
-          Type = "simple";
-          User = "root";
-          ExecStart = ''${pkgs.muellshack}/bin/muellshack'';
-          ExecStop = "";
-          Restart = "always";
-        };
-      };
+  # systemd.services.muellshack =
+  #     { description = "muellshack";
+  #       enable = true;
+  #       wantedBy = [ "multi-user.target" "nginx.service" ];
+  #       after = [ "network.service" "local-fs.target" ];
+  #       serviceConfig = {
+  #         Type = "simple";
+  #         User = "root";
+  #         ExecStart = ''${pkgs.muellshack}/bin/muellshack'';
+  #         ExecStop = "";
+  #         Restart = "always";
+  #       };
+  #     };
 
   networking.firewall.allowedTCPPorts = [ 80 443 ]; #5
 
@@ -45,11 +57,12 @@ in
     virtualHosts."playnft.hhefesto.com" = {
       enableACME = true;
       forceSSL = true;
-      locations = {
-        "/" = {
-          proxyPass = "http://localhost:8081";
-        };
-      };
+      root = ''${pkgs.elm_frontend}'';
+      # locations = {
+      #   "/" = {
+      #     proxyPass = "http://localhost:8081";
+      #   };
+      # };
     };
   };
 

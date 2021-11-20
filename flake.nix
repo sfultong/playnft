@@ -35,6 +35,7 @@
       overlay = final: prev: {
         react_frontend = prev.callPackage ./react {};
 	      eth_contracts = prev.callPackage ./eth {};
+        elm_frontend = prev.callPackage ./elm {};
       };
 
       nixopsConfigurations.default = {
