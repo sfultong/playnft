@@ -7,9 +7,11 @@
     #   url = "github:justinwoo/easy-purescript-nix";
     #   flake = false;
     # };
+    # nixpkgs.url = "nixpkgs/nixos-20.09";
     nixpkgs.url = "nixpkgs/nixos-unstable";
     # nixops.url  = "github:lukebfox/nixops-plugged";
-    nixops.url = "github:NixOS/nixops";
+    # nixops.url = "github:lukebfox/nixops-plugged";
+    # nixops.url = "github:NixOS/nixops";
     utils.url = "github:numtide/flake-utils";
     flake-compat = {
       url = "github:edolstra/flake-compat";
@@ -19,7 +21,7 @@
 
   outputs = { self
             , nixpkgs
-            , nixops
+            # , nixops
             , utils
             , flake-compat
             , ...
@@ -41,6 +43,9 @@
       nixopsConfigurations.default = {
         inherit nixpkgs;
         network.description = domain;
+        network.storage.legacy = {
+          databasefile = "~/.nixops/deployments.nixops";
+        };
         defaults.nixpkgs.pkgs = pkgsFor "x86_64-linux";
         defaults._module.args = {
           inherit domain;
