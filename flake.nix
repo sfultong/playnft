@@ -8,10 +8,12 @@
     #   flake = false;
     # };
     # nixpkgs.url = "nixpkgs/nixos-20.09";
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-    # nixops.url  = "github:lukebfox/nixops-plugged";
+    nixpkgs.url = "nixpkgs/nixos-21.05";
+    # nixpkgs.url = "nixpkgs/nixos-21.11";
+    # nixpkgs.url = "nixpkgs/nixos-unstable";
+    # nixops.url  = "github:NixOS/nixops";
     # nixops.url = "github:lukebfox/nixops-plugged";
-    # nixops.url = "github:NixOS/nixops";
+    nixops.url = "github:input-output-hk/nixops-flake";
     utils.url = "github:numtide/flake-utils";
     flake-compat = {
       url = "github:edolstra/flake-compat";
@@ -21,7 +23,7 @@
 
   outputs = { self
             , nixpkgs
-            # , nixops
+            , nixops
             , utils
             , flake-compat
             , ...
@@ -35,33 +37,44 @@
 
     in {
       overlay = final: prev: {
-        react_frontend = prev.callPackage ./react {};
-	      eth_contracts = prev.callPackage ./eth {};
-        elm_frontend = prev.callPackage ./elm {};
+        react-frontend = prev.callPackage ./react {};
+	      eth-contracts = prev.callPackage ./eth {};
+        elm-frontend = prev.callPackage ./elm {};
+        js-backend =  prev.callPackage ./eth {};
       };
 
-      nixopsConfigurations.default = {
-        inherit nixpkgs;
-        network.description = domain;
-        network.storage.legacy = {
-          databasefile = "~/.nixops/deployments.nixops";
-        };
-        defaults.nixpkgs.pkgs = pkgsFor "x86_64-linux";
-        defaults._module.args = {
-          inherit domain;
-        };
-        webserver = import ./machine;
-      };
+      # nixopsConfigurations.default = {
+      #   inherit nixpkgs;
+      #   network.description = domain;
+      #   network.storage.legacy = {
+      #     databasefile = "~/.nixops/deployments.nixops";
+      #   };
+      #   defaults.nixpkgs.pkgs = pkgsFor "x86_64-linux";
+      #   defaults._module.args = {
+      #     inherit domain;
+      #   };
+      #   webserver = import ./machine;
+      # };
 
     } // utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let pkgs = pkgsFor system;
           # easy-ps = import easy-purescript-nix { inherit pkgs; };
       in {
-        defaultPackage = pkgs.eth_contracts;
+        defaultPackage = pkgs.eth-contracts;
+        packages.playNFT-frontend = pkgs.elm-frontend;
+        packages.playNFT-backend = pkgs.js-backend;
 
         devShell = pkgs.mkShell {
+          # nativeBuildInputs = [ nixops.packages.${system}."nixops_1_8-nixos-unstable" ];
+          # nativeBuildInputs = [ nixops.packages.${system}."nixops_2_0-2021-01-unstable" ];
           # nativeBuildInputs = [ nixops.defaultPackage.${system} ];
+          # nativeBuildInputs = [ pkgs.nixopsUnstable ];
+          # nativeBuildInputs = [ pkgs.nixops ];
+
           buildInputs = [
+            # nixops.packages.${system}."nixops_1_8-nixos-unstable"
+            pkgs.nixops
+            # nixops.packages.${system}."nixops_2_0-2021-01-unstable"
             pkgs.elmPackages.elm
             pkgs.elmPackages.elm-live
             pkgs.elmPackages.create-elm-app
@@ -70,13 +83,13 @@
             pkgs.yarn
             pkgs.yarn2nix
 
-            pkgs.nixopsUnstable
+            # pkgs.nixopsUnstable
 
             # easy-ps.purs-0_14_4
             # easy-ps.psc-package
             # easy-ps.spago
             pkgs.nodejs
-            pkgs.ghc
+            # pkgs.ghc
 
             # pkgs.stack
             # nixops.packages.nixops-gce
