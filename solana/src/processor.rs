@@ -3,7 +3,7 @@ use solana_program::{
     entrypoint::ProgramResult,
     program_error::ProgramError,
     msg,
-    pubkey::Pubkey,
+    pubkey::{Pubkey, PubkeyError},
     program_pack::{Pack, IsInitialized},
     sysvar::{rent::Rent, Sysvar},
     program::{invoke, invoke_signed},
@@ -16,8 +16,6 @@ use crate::error::PlaynftError;
 
 pub struct Processor;
 impl Processor {
-
-    const ARTISTS: &'static [u8] = b"Artists";
 
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
         let instruction = PlaynftInstruction::try_from_slice(instruction_data)?;
@@ -64,6 +62,52 @@ impl Processor {
         }
     }
 
+    // deterministic address generation section
+    fn gen_playnft_address(
+        admin_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        Pubkey::create_with_seed(admin_key, &"playnft", pid_key)
+    }
+    fn gen_artist_address(
+        artist_id: u32,
+        admin_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        let seed = &["artists", &artist_id.to_string()].join("");
+        Pubkey::create_with_seed(admin_key, seed, pid_key)
+    }
+    fn gen_profile_address(
+        artist_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        Pubkey::create_with_seed(artist_key, &"profile", pid_key)
+    }
+    fn gen_art_address(
+        art_id: u16,
+        artist_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        let seed = &["art", &art_id.to_string()].join("");
+        Pubkey::create_with_seed(artist_key, seed, pid_key)
+    }
+    fn gen_feature_address(
+        feature_id: u16,
+        art_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        let seed = &["feature", &feature_id.to_string()].join("");
+        Pubkey::create_with_seed(art_key, seed, pid_key)
+    }
+    fn gen_bid_address(
+        bid_id: u16,
+        feature_key: &Pubkey,
+        pid_key: &Pubkey,
+    ) -> Result<Pubkey, PubkeyError> {
+        let seed = &["bid", &bid_id.to_string()].join("");
+        Pubkey::create_with_seed(feature_key, seed, pid_key)
+    }
+
     fn set_fee(
         accounts: &[AccountInfo],
         program_id: &Pubkey,
@@ -74,7 +118,7 @@ impl Processor {
                 let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow())?;
 
                 // validate account addresses
-                let test_playnft_address = Pubkey::create_with_seed(admin_account.key, "playNFT", program_id)?;
+                let test_playnft_address = Self::gen_playnft_address(admin_account.key, program_id)?;
                 if &test_playnft_address != playnft_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -100,12 +144,11 @@ impl Processor {
         let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow())?;
 
         // validate account addresses
-        let test_playnft_address = Pubkey::create_with_seed(admin.key, "playNFT", program_id)?;
+        let test_playnft_address = Self::gen_playnft_address(admin.key, program_id)?;
         if &test_playnft_address != playnft_account.key {
             return Err(ProgramError::InvalidAccountData);
         }
-        let artist_seed = &["artists", &playnft_data.num_artists.to_string()].join("");
-        let test_artist_address = Pubkey::create_with_seed(admin.key, artist_seed, program_id)?;
+        let test_artist_address = Self::gen_artist_address(playnft_data.num_artists, admin.key, program_id)?;
         if &test_artist_address != artist_storage.key {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -117,7 +160,6 @@ impl Processor {
         let artist_data = ArtistVal { address: *artist_address };
         artist_data.serialize(&mut &mut artist_storage.data.borrow_mut()[..])?;
         
-        //let (pda, bump_seed) = Pubkey::find_program_address(&[ARTISTS], program_id);
         Ok(())
     }
 
@@ -132,7 +174,7 @@ impl Processor {
                 let mut profile = ArtistProfile::try_from_slice(&profile_account.data.borrow())?;
 
                 // validate account addresses
-                let test_profile_address = Pubkey::create_with_seed(artist_account.key, "profile", program_id)?;
+                let test_profile_address = Self::gen_profile_address(artist_account.key, program_id)?;
                 if &test_profile_address != profile_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -152,14 +194,6 @@ impl Processor {
         program_id: &Pubkey,
         end_time: i64,
     ) -> ProgramResult {
-        /*
-        let account_info_iter = &mut accounts.iter();
-        let artist_account = next_account_info(account_info_iter)?;
-        let artist_profile_account = next_account_info(account_info_iter)?;
-        let art_account = next_account_info(account_info_iter)?;
-        let first_feature_account = next_account_info(account_info_iter)?;
-        let second_feature_account = next_account_info(account_info_iter)?;
-        */
         match accounts {
             [artist_account, artist_profile_account, art_account, feature_account_a, feature_account_b] => {
                 let mut artist_profile_data = ArtistProfile::try_from_slice(&artist_profile_account.data.borrow())?;
@@ -169,22 +203,19 @@ impl Processor {
                 let art_id = artist_profile_data.num_art;
                 
                 // validate account addresses
-                let test_profile_address = Pubkey::create_with_seed(artist_account.key, "profile", program_id)?;
+                let test_profile_address = Self::gen_profile_address(artist_account.key, program_id)?;
                 if &test_profile_address != artist_profile_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let art_seed = &["art", &art_id.to_string()].join("");
-                let test_art_address = Pubkey::create_with_seed(artist_account.key, art_seed, program_id)?;
+                let test_art_address = Self::gen_art_address(art_id, artist_account.key, program_id)?;
                 if &test_art_address != art_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let feature_seed_a = &["feature", "0"].join("");
-                let test_feature_a_address = Pubkey::create_with_seed(art_account.key, feature_seed_a, program_id)?;
+                let test_feature_a_address = Self::gen_feature_address(0, art_account.key, program_id)?;
                 if &test_feature_a_address != feature_account_a.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let feature_seed_b = &["feature", "1"].join("");
-                let test_feature_b_address = Pubkey::create_with_seed(art_account.key, feature_seed_b, program_id)?;
+                let test_feature_b_address = Self::gen_feature_address(1, art_account.key, program_id)?;
                 if &test_feature_b_address != feature_account_b.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -225,8 +256,8 @@ impl Processor {
 
                 //TODO validate feature account?
                 // validate new bid account
-                let new_bid_seed = &["bid", &feature_data.num_bids.to_string()].join("");
-                let test_new_bid_address = Pubkey::create_with_seed(feature_account.key, new_bid_seed, program_id)?;
+                let test_new_bid_address = 
+                    Self::gen_bid_address(feature_data.num_bids, feature_account.key, program_id)?;
                 if &test_new_bid_address != new_bid_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -240,9 +271,8 @@ impl Processor {
                         let mut old_bid = Bid::try_from_slice(&old_bid_account.data.borrow())?;
                         
                         // validate account addresses
-                        let old_bid_seed = &["bid", &(feature_data.num_bids - 1).to_string()].join("");
                         let test_old_bid_address = 
-                            Pubkey::create_with_seed(feature_account.key, old_bid_seed, program_id)?;
+                            Self::gen_bid_address(feature_data.num_bids - 1, feature_account.key, program_id)?;
                         if &test_old_bid_address != old_bid_account.key {
                             return Err(ProgramError::InvalidAccountData);
                         }
@@ -343,18 +373,15 @@ impl Processor {
                 let bid_data = Bid::try_from_slice(&bid_account.data.borrow())?;
 
                 // validate account addresses
-                let art_seed = &["art", &art_id.to_string()].join("");
-                let test_art_address = Pubkey::create_with_seed(artist_account.key, art_seed, program_id)?;
+                let test_art_address = Self::gen_art_address(art_id, artist_account.key, program_id)?;
                 if &test_art_address != art_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let feature_seed = &["feature", &feature_id.to_string()].join("");
-                let test_feature_address = Pubkey::create_with_seed(art_account.key, feature_seed, program_id)?;
+                let test_feature_address = Self::gen_feature_address(feature_id, art_account.key, program_id)?;
                 if &test_feature_address != feature_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let bid_seed = &["bid", &bid_id.to_string()].join("");
-                let test_new_bid_address = Pubkey::create_with_seed(feature_account.key, bid_seed, program_id)?;
+                let test_new_bid_address = Self::gen_bid_address(bid_id, feature_account.key, program_id)?;
                 if &test_new_bid_address != bid_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -399,13 +426,11 @@ impl Processor {
                 let mut new_feature_data = Feature::try_from_slice(&feature_account.data.borrow())?;
 
                 // validate account addresses
-                let art_seed = &["art", &art_id.to_string()].join("");
-                let test_art_address = Pubkey::create_with_seed(artist_account.key, art_seed, program_id)?;
+                let test_art_address = Self::gen_art_address(art_id, artist_account.key, program_id)?;
                 if &test_art_address != art_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let feature_seed = &["feature", &art_data.num_features.to_string()].join("");
-                let test_feature_address = Pubkey::create_with_seed(art_account.key, feature_seed, program_id)?;
+                let test_feature_address = Self::gen_feature_address(art_data.num_features, art_account.key, program_id)?;
                 if &test_feature_address != feature_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
@@ -435,8 +460,7 @@ impl Processor {
                 let mut art_data = Art::try_from_slice(&art_account.data.borrow())?;
 
                 // validate account addresses
-                let art_seed = &["art", &art_id.to_string()].join("");
-                let test_art_address = Pubkey::create_with_seed(artist_account.key, art_seed, program_id)?;
+                let test_art_address = Self::gen_art_address(art_id, artist_account.key, program_id)?;
                 if &test_art_address != art_account.key {
                     return Err(ProgramError::InvalidAccountData);
                 }
