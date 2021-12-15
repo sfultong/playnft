@@ -15,6 +15,7 @@ node_modules/
 *-notes.*
 .idea/
 dist/
+elm/*.dat
 
 Main.min.js
 
