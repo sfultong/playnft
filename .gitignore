@@ -1,9 +1,22 @@
 eth/build/
 eth/node_modules/
-eth/yarn.lock
+# eth/yarn.lock
 eth/.env
 react/node_modules/
 react/yarn.lock
 react/images/
 react/.env
 
+elm-stuff/
+Test.elm
+elm.js
+.DS_Store
+node_modules/
+*-notes.*
+.idea/
+dist/
+elm/*.dat
+
+Main.min.js
+
+result*

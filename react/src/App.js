@@ -800,7 +800,7 @@ function App() {
     const [getAddr, setAddr] = useState("no address loaded");
 
     const messageGet = async (t) => {
-	      t.preventDefault();
+	    t.preventDefault();
         siteContract.then((sc) => {
             sc.methods.getTestMessage().call().then((tm) => {
                 setTest(tm);
