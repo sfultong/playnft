@@ -6,6 +6,8 @@ react/node_modules/
 react/yarn.lock
 eth/images/
 react/.env
+solana/Cargo.lock
+solana/target
 
 elm-stuff/
 Test.elm
