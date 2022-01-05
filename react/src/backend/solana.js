@@ -9,6 +9,8 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import * as borsh from 'borsh';
+import { Keccak } from 'sha3';
+import axios from 'axios';
 
 const TE = new TextEncoder();
 const TD = new TextDecoder();
@@ -320,7 +322,8 @@ const adminAddress = new Promise((resolve, reject) => {
 const getPnftAddress = new Promise((resolve, reject) => {
         adminAddress.then(aa => {
                 PublicKey.createWithSeed(aa, PLAYNFT_SEED, PROGRAM_ID_PUBKEY).then(pntfa => {
-			resolve({publicKey: pntfa, seed: PLAYNFT_SEED, size: PLAYNFT_DATA_SIZE, type: PlayNFTData});
+			resolve({publicKey: pntfa, seed: PLAYNFT_SEED, size: PLAYNFT_DATA_SIZE, type: PlayNFTData
+				, baseKey: aa});
 		});
 	});
 });
@@ -329,7 +332,8 @@ const getArtistAddressAddress = function (artistId) {
                 adminAddress.then(aa => {
                         const seed = "artists" + artistId;
                         PublicKey.createWithSeed(aa, seed, PROGRAM_ID_PUBKEY)
-                        .then(aaa => resolve({publicKey: aaa, seed: seed, size: ARTISTVAL_DATA_SIZE, type: ArtistVal}));
+                        .then(aaa => resolve({publicKey: aaa, seed: seed, size: ARTISTVAL_DATA_SIZE, type: ArtistVal
+				, baseKey: aa}));
                 });
         });
 };
@@ -338,28 +342,29 @@ const getArtistProfileAddress = function (artistKey) {
 		const seed = "profile";
 		PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
 			.then(apa => resolve({publicKey: apa, seed: seed, size: ARTIST_PROFILE_DATA_SIZE
-				, type: ArtistProfile}));
+				, type: ArtistProfile, baseKey: artistKey}));
 	});
 };
 const getArtAddress = function (art_id, artistKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "art" + art_id;
 		PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
-		.then(aa => resolve({publicKey: aa, seed: seed, size: ART_DATA_SIZE, type: Art}));
+		.then(aa => resolve({publicKey: aa, seed: seed, size: ART_DATA_SIZE, type: Art, baseKey: artistkey}));
 	});
 };
 const getFeatureAddress = function (feature_id, artKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "feature" + feature_id;
 		PublicKey.createWithSeed(artKey, seed, PROGRAM_ID_PUBKEY)
-		.then(fa => resolve({publicKey: fa, seed: seed, size: FEATURE_DATA_SIZE, type: Feature}));
+		.then(fa => resolve({publicKey: fa, seed: seed, size: FEATURE_DATA_SIZE, type: Feature
+			, baseKey: artKey}));
 	});
 };
 const getBidAddress = function (bid_id, featureKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "bid" + bid_id;
 		PublicKey.createWithSeed(featureKey, seed, PROGRAM_ID_PUBKEY)
-		.then(ba => resolve({publicKey: ba, seed: seed, size: BID_DATA_SIZE, type: Bid}));
+		.then(ba => resolve({publicKey: ba, seed: seed, size: BID_DATA_SIZE, type: Bid, baseKey: featureKey}));
 	});
 };
 
@@ -372,7 +377,7 @@ const playNFTDataAddress = new Promise((resolve, reject) => {
                                 if (! ai) {
                                         console.log("initializing playNFT data");
 					newTransaction().then(t => {
-						createAccount(aa, aa, pntfa).then(ix => {
+						createAccount(pntfa).then(ix => {
 							t.add(ix);
 							signSendConfirm(t).then(_ => resolve(pntfa));
 						});
@@ -404,22 +409,34 @@ const playNFTDataAddress = new Promise((resolve, reject) => {
         });
 });
 
-const createAccount = function (uk, bk, a) {
+const createAccount = function (a) {
         return new Promise ((resolve, reject) => {
-		connection.getMinimumBalanceForRentExemption(a.size).then(lamSize => 
-			resolve(SystemProgram.createAccountWithSeed({
-				space: a.size,
-				lamports: lamSize,
-				fromPubkey: uk,
-				basePubkey: bk,
-				seed: a.seed,
-				newAccountPubkey: a.publicKey,
-				programId: PROGRAM_ID_PUBKEY,
-			}));
-		);
+		userPubkey.then(uk = {
+			connection.getMinimumBalanceForRentExemption(a.size).then(lamSize => 
+				resolve(SystemProgram.createAccountWithSeed({
+					space: a.size,
+					lamports: lamSize,
+					fromPubkey: uk,
+					basePubkey: a.baseKey,
+					seed: a.seed,
+					newAccountPubkey: a.publicKey,
+					programId: PROGRAM_ID_PUBKEY,
+				}));
+			);
+		});
+
 	});
 }
 
+const deserialize = function (a) {
+        return new Promise ((resolve, reject) => {
+		connection.getAccountInfo(a.publicKey).then(accountInfo => {
+			resolve(borsh.deserialize(PlayNFTSchema, a.type, accountInfo.data));
+		});
+	});
+};
+
+/*
 const getPlayNFTData = function () {
         return new Promise ((resolve, reject) => {
                 playNFTDataAddress.then(pnfta => {
@@ -429,7 +446,6 @@ const getPlayNFTData = function () {
                 });
         });
 };
-
 const getArtistAddress = function (artistId) {
         return new Promise ((resolve, reject) => {
                 getArtistAddressAddress(artistId).then(aaa => {
@@ -440,7 +456,6 @@ const getArtistAddress = function (artistId) {
                 });
         });
 };
-
 const getArtistProfile = function (artistKey) {
         return new Promise ((resolve, reject) => {
 		getArtistProfileAddress(artistKey).then(apa => {
@@ -450,21 +465,26 @@ const getArtistProfile = function (artistKey) {
 		});
 	});
 };
+*/
+
+const playnftInstruction = function (i, keys) {
+	return new TransactionInstruction({
+		programId: PROGRAM_ID_PUBKEY,
+		data: borsh.serialize(PlayNFTSchema, new PlayNFTInstruction(i)),
+		keys: keys
+	});
+};
 
 const addArtist = function (artistAddress) {
         return new Promise ((resolve, reject) => {
                 userPubkey.then(uk => {
                         playNFTDataAddress.then(playNFTAddress => {
-                                getPlayNFTData().then(pnftData => {
+                                deserialize(playNFTAddress).then(pnftData => {
                                         getArtistAddressAddress(pnftData.numArtists).then(aaa => {
 						newTransaction().then(t => {
-							createAccount(uk, uk, aaa).then(ix => {
-								const pnftIx = new TransactionInstruction({
-									programId: PROGRAM_ID_PUBKEY,
-									data: borsh.serialize(PlayNFTSchema, 
-										new PlayNFTInstruction(new AddArtist(
-											artistAddress))),
-									keys: [
+							createAccount(aaa).then(ix => {
+								const pnftIx = playnftInstruction(new AddArtist(artistAddress),
+									[
 										{pubkey: uk, isSigner: true
 											, isWritable: false},
 										{pubkey: playNFTAddress.publicKey
@@ -473,8 +493,7 @@ const addArtist = function (artistAddress) {
 										{pubkey: aaa.publicKey, isSigner: false
 											, isWritable: true},
 									],
-
-								});
+								);
 								t.add(ix, pnftIx);
                                                                 signSendConfirm(t).then(_ => resolve(aaa));
 							});
@@ -530,22 +549,20 @@ const modifyArtistProfile = function (name, description) {
 					const sendTx = function () {
 						const iData = {name: name, description: description};
 						const instr = new PlayNFTInstruction(new ModifyArtistProfile(iData));
-						ixs.push(new TransactionInstruction({
-							programId: PROGRAM_ID_PUBKEY,
-							data: borsh.serialize(PlayNFTSchema, instr),
-							keys: [
+						ixs.push(playnftInstruction(instr,
+							[
 								{pubkey: uk, isSigner: true, isWritable: false},
 								{pubkey: apa.publicKey, isSigner: false
 									, isWritable: true},
 							],
-						}));
+						);
 						newTransaction().then(t => {
 							ixs.forEach(i => t.add(i));
 							signSendConfirm(t).then(_ => resolve());
 						});
 					};
 					if (! accountInfo) {
-						createAccount(uk, uk, apa).then(ix => {
+						createAccount(apa).then(ix => {
 							ixs.push(ix);
 							sendTx();
 						});
@@ -578,21 +595,17 @@ const startArtWithFeature = function (endTime) {
         return new Promise ((resolve, reject) => {
                 userPubkey.then(uk => {
 			getArtistProfileAddress(uk).then(apa => {
-				getArtistProfile(ap => {
+				deserialize(apa).then(ap => {
 					getArtAddress(ap.numArt, uk).then(aa => {
 						getFeatureAddress(0, aa.publicKey).then(faa => {
 							getFeatureAddress(1, aa.publicKey).then(fab => {
 								Promise.all(
-									createAccount(uk, uk, aa),
-									createAccount(uk, aa.publicKey, faa),
-									createAccount(uk, aa.publicKey, fab),
+									createAccount(aa),
+									createAccount(faa),
+									createAccount(fab),
 								).then(ixs => {
-									ixs.push(new TransactionInstruction({
-										programId: PROGRAM_ID_PUBKEY,
-										data: borsh.serialize(PlayNFTSchema,
-											new PlayNFTInstruction(
-												new StartArt(endTime))),
-										keys: [
+									ixs.push(playnftInstruction(new StartArt(endTime),
+										[
 											{pubkey: uk, isSigner: true,
 												isWritable: false},
 											{pubkey: apa.publicKey,
@@ -608,11 +621,14 @@ const startArtWithFeature = function (endTime) {
 												isSigner: false,
 												isWritable: true},
 										],
-									}));
-									newTransactiion().then(t => {
+									));
+									newTransaction().then(t => {
 										ixs.forEach(i => t.add(i));
 										signSendConfirm(t).then(_ => 
-											resolve(aa));
+											resolve({
+												artAddress: aa,
+												artId: ap.numArt,
+											}));
 									});
 								});
 							});
@@ -624,13 +640,211 @@ const startArtWithFeature = function (endTime) {
 	});
 };
 
-// const startFeature = function (artId, endTime) {
-// const makeBid = function (artId, request, amount) {
-// const nextFeature = function (artId, endTime) {
-// const finishArt = function (artId) {
-// const signFeatureImage = function (featureId, imageHash) {
-// const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageData) {
-// const controlStartArtWithFeature = function (featureEndTime, imageData) {
+const nextFeature = function (artId, endTime) {
+        return new Promise ((resolve, reject) => {
+                userPubkey.then(uk => {
+			getArtAddress(artId, uk).then(aa => {
+				deserialize(aa).then(art => {
+					getFeatureAddress(art.numFeatures, aa).then(fa => {
+						createAccount(fa).then(ix => {
+							newTransaction().then(t => {
+								t.add(ix);
+								t.add(playnftInstruction(
+									new NextFeature(artId, endTime),
+									[
+										{pubkey: uk, isSigner: true
+											, isWritable: false},
+										{pubkey: aa.publicKey, isSigner: false
+											, isWritable: true},
+										{pubkey: fa.publicKey, isSigner: false
+											, isWritable: true}
+									]
+								));
+								signSendConfirm(t).then(_ => resolve(fa));
+							});
+						});
+					});
+				});
+			});
+		});
+	});
+};
+
+const makeBid = function (artId, request, amount) {
+        return new Promise ((resolve, reject) => {
+                userPubkey.then(uk => {
+                        playNFTDataAddress.then(playNFTAddress => {
+				getArtAddress(artId, uk).then(aa => {
+					deserialize(aa).then(art => {
+						getFeatureAddress(art.numFeatures - 1, aa).then(fa => {
+							deserialize(fa).then(feature => {
+								const addOldBid = function (oks) {
+									new Promise ((resolve, reject) => {
+										// if not the first bid, requires old bid
+										if (feature.numBids) {
+											getBidAddress(feature.numBids - 1, fa)
+											.then(ba => {
+												resolve(oks.concat([
+													{ pubkey: ba.pub
+													, isSigner: false
+													, isWritable: false
+													}
+												]));
+											});
+										} else {
+											resolve(oks);
+										}
+									});
+								};
+								getBidAddress(feature.numBids, fa).then(ba => {
+									const ka = [
+										{pubkey: uk, isSigner: true,
+											isWritable: false
+										},
+										{pubkey: playNFTAddress,
+											isSigner: false,
+											isWritable: false},
+										{pubkey: fa.publicKey,
+											isSigner: false,
+											isWritable: true},
+										{pubkey: ba.publicKey,
+											isSigner: false,
+											isWritable: true},
+									];
+									newTransaction().then(t => {
+										addOldBid(ka).then(keys => {
+											t.add(playnftInstruction(
+												new MakeBid(amount,
+													request),
+												keys));
+											signSendConfirm(t).then(_ =>
+												resolve(ba));
+										});
+									});
+								});
+							});
+						});
+					});
+				});
+			});
+		});
+	});
+};
+
+const finishArt = function (artId) {
+        return new Promise ((resolve, reject) => {
+                userPubkey.then(uk => {
+			getArtAddress(artId, uk).then(aa => {
+				newTransaction().then(t => {
+					t.add(playnftInstruction(
+						new FinishArt(artId),
+						[
+							{pubkey: uk, isSigner: true, isWritable: false},
+							{pubkey: aa, isSigner: false, isWritable: true},
+						]
+					));
+				});
+			});
+		});
+	});
+};
+
+const signFeatureImage = function (featureId, imageHash) {
+        return new Promise ((resolve, reject) => {
+		const message = {message:{featureId:featureId, imageHash:imageHash}};
+		window.solana.signMessage(TE.encode(JSON.stringify(message)), "utf8").then(sm => 
+			resolve({message: message, signature: sm})
+		);
+	});
+};
+
+const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageData) {
+        return new Promise ((resolve, reject) => {
+		const hash = new Keccak(256);
+		hash.update(imageData);
+		const imageHash = hash.digest('hex');
+
+                userPubkey.then(uk => {
+			signfeatureImage(featureId, imageHash).then(signResult => {
+				const formData = new FormData();
+				formData.append("imageData", imageData);
+				formData.append("signedData", signResult.message);
+				formData.append("signature", signResult.signature);
+				formData.append("artistAddress", uk);
+				formData.append("artId", artId);
+				formData.append("feature", featureId);
+
+				axios.post(apiHost + "/upload-image", formData).then ((res) => {
+				    if (res.data.status) {
+
+					if (completeArtwork) {
+					    finishArt(artId).then(_ => {
+						resolve();
+					    });
+
+					} else {
+					    nextFeature(artId, featureEndTime).then((featureReceipt) => {
+						resolve(featureReceipt);
+					    });
+					}
+				    } else {
+					reject({error: "error uploading image", result:res});
+				    }
+				}).catch ((err) => {
+				    reject({error: "problem signing/posting image", result:err});
+				});
+			});
+		});
+	});
+};
+
+const controlStartArtWithFeature = function (featureEndTime, imageData) {
+        return new Promise ((resolve, reject) => {
+		startArtWithFeature().then(receipt => {
+			const artId = receipt.artId;
+			const featureId = 0;
+			controlCompleteFeature(artId, featureId, false, featureEndTime, imageData).then(r => 
+				resolve(r)).catch(err => reject(err));
+		});
+	});
+};
+
+const getArtDisplay = function (artistAddress, artId) {
+        return new Promise ((resolve, reject) => {
+		getArtistProfileAddress(artistAddress).then(apa => {
+			deserialize(apa).then(ap => {
+				getArtAddress(artId, artistAddress).then(aa => {
+					deserialize(aa).then(art => {
+						const displayFeature = art.finished ? art.numFeatures - 1
+							: art.numfeatures - 2;
+						const imgUrl = apiHost + "/" + artistAddress + "/" + artId + "_" 
+							+ displayfeature;
+
+						getFeatureAddress(displayFeature, aa).then(fa => {
+							deserialize(fa).then(feature => {
+								getBidAddress(feature.numBids - 1, fa).then(ba => {
+									deserialize(ba).then(bid => {
+										resolve({
+											artistName: ap.name,
+											imgUrl: imgurl,
+											timeText: feature.endTime,
+											bidAmount: bid.amount,
+											featureRequest: bid.request,
+											artId: artId,
+											featureId: displayFeature,
+										});
+									});
+								});
+							});
+						});
+					});
+				});
+			});
+		});
+	});
+};
+
+// const startFeature = function (artId, endTime) { // don't need this if we have nextFeature
 // // returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
 // const getArtDisplay = function (i) { // i is the artId
 
