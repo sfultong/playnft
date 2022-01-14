@@ -2,68 +2,36 @@ import React, { useState } from "react";
 import logo from './logo.svg';
 import './App.css';
 
-import * from './backend/ethereum';
+import { api } from './backend/ethereum';
 
 class MetaMaskButton extends React.Component {
     constructor(props) {
-        super(props);
+	super(props);
 
         this.handleClick = this.handleClick.bind(this);
         this.getDisplay = this.getDisplay.bind(this);
-        this.login = this.login.bind(this);
+	this.controls = api.makeWeb3LoginControls();
+    }
 
-        this.state = {
-            value: installMetamask,
-        };
-
-        var t = this;
-        var cb = function () {
-            t.setState({value: loginMetamask});
-        };
-        web3.then(cb);
+    componentDidMount() {
+	    this.controls.initComponent(_ => this.setState({initSuccess: true}));
     }
 
     handleClick () {
-        if (this.state.value === installMetamask) {
-            window.open(
-              "https://metamask.io/",
-              "_blank"
-            );
-        } else if (this.state.value === loginMetamask) {
-            this.login();
-        } else {
-            // shouldn't be possible
-            alert("handleClick: shouldn't be here");
-        }
-    }
-
-    async login () {
-        const t = this;
-        try {
-            const provider = await detectEthereumProvider();
-            provider.request({ method: 'eth_requestAccounts' })
-                .then((result) => {
-                    t.setState({value: activeMetamask});
-                })
-                .catch((error) => {
-                });
-        } catch (error) {
-        }
+	    this.controls.handleClick(_ =>  this.setState({success: true}));
     }
 
     getDisplay () {
-        return this.state.value === installMetamask ? "Install Metamask"
-            : this.state.value === loginMetamask ? "Login to Metamask"
-            : "This message should be hidden";
+	    this.controls.getDisplay();
     }
 
     render () {
-        if (this.state.value === activeMetamask) {
+        if (this.controls.shouldHide()) {
             return (<div></div>);
         } else
         return (
-                <button className="button" onClick={this.handleClick}>
-                {this.getDisplay()}
+                <button className="button" onClick={this.controls.handleClick}>
+                {this.controls.getDisplay()}
                 </button>
         );
     }
@@ -78,26 +46,24 @@ class AdminInterface extends React.Component {
 
         this.state = {
         };
+	
+	this.controls = api.makeAdminControls();
     }
 
     componentDidMount() {
-        siteContract.then((sc) => {
-            sc.methods.getNumArtist().call().then((na) => {
-                this.setState({numArtists: na});
-            });
-        });
+	    this.controls.initComponent(na => this.setState({numArtists: na}));
     }
 
     changeHandler (v) {
         this.setState({address: v.target.value});
     }
 
-    async handleSubmit (t) {
-        t.preventDefault();
-        const address = this.state.address;
-        addArtist(address).then((receipt) => {
-            alert("added artist");
-        });
+    handleSubmit (t) {
+	t.preventDefault();
+       	const address = this.state.address;
+	this.controls.handleSubmit(address, _ => {
+		    alert("added artist");
+	});
     }
 
     render () {
@@ -133,15 +99,13 @@ class ArtistInterface extends React.Component {
 
         this.state = {
         };
+	
+	this.controls = api.makeArtistControls();
     }
 
     componentDidMount() {
         const thisComponent = this;
-        userAccount.then ((account) => {
-            getArtist(account).then((artist) => {
-                thisComponent.setState({artistName: artist[0], artistDescription: artist[1]});
-            });
-        });
+	this.controls.initComponent(a => thisComponent.setState(a));
     }
 
     nameChangeHandler (event) {
@@ -162,12 +126,8 @@ class ArtistInterface extends React.Component {
     }
 
     profileSubmit () {
-        const thisComponent = this;
-        userAccount.then ((account) => {
-            modifyArtistProfile(thisComponent.state.artistName, thisComponent.state.artistDescription).then((result) => {
-                alert("modified profile");
-            });
-        });
+	this.controls.profileSubmit(this.state.artistName, this.state.artistDescription, _ => 
+		alert("modified profile"));
     }
 
     async handleSubmit () {
@@ -182,7 +142,7 @@ class ArtistInterface extends React.Component {
             reader.onloadend = function() {
                 const imageData = reader.result;
 
-                controlStartArtWithFeature(featureEndTime, imageData).then(receipt => {
+                api.controlStartArtWithFeature(featureEndTime, imageData).then(receipt => {
                     alert("new art created");
                 }, err => {
                     alert(err.error);
@@ -268,7 +228,7 @@ class ArtListing extends React.Component {
         if (myBid * 1 <= this.state.bidAmount * 1) {
             alert("you must make a higher bid");
         } else {
-            makeBid(this.props.artId, myRequest, myBid).then((receipt) => {
+            api.makeBid(this.props.artId, myRequest, myBid).then((receipt) => {
                 alert("You are now the highest bidder!");
                 thisComponent.setState({featureRequest:"Feature request: " + myRequest, bidAmount:"Bid amount: " + myBid});
             });
@@ -276,7 +236,7 @@ class ArtListing extends React.Component {
     }
 
     componentDidMount() {
-        getArtDisplay(this.props.artId).then((art) => {this.setState(art);});
+        api.getArtDisplay(this.props.artId).then((art) => {this.setState(art);});
     }
 
     completeFeature () {
@@ -290,7 +250,7 @@ class ArtListing extends React.Component {
         reader.readAsDataURL(thisFile);
         reader.onloadend = function () {
             const imageData = reader.result;
-            controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, imageData).then(receipt => {
+            api.controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, imageData).then(receipt => {
                 //TODO choose correct message
                 alert("art has been finished or bidding for next feature has started");
             }, err => {
@@ -355,7 +315,7 @@ class ArtDisplay extends React.Component {
 
     componentDidMount() {
         const thisComponent = this;
-        getNumArt().then((na) => {
+        api.getNumArt().then((na) => {
             var artIds = [];
             for (var i = 1; i <= 10 && na - i >= 0; i++) {
                 var artId = na - i;
@@ -364,14 +324,14 @@ class ArtDisplay extends React.Component {
             thisComponent.setState({artIds:artIds});
 
             // listen for new art to display
-            registerArtCreatedListener(artId => {
+            api.registerArtCreatedListener(artId => {
                 console.log("new art id " + artId);
                 var newList = thisComponent.state.artIds;
                 newList.unshift(artId);
                 thisComponent.setState({artIds: newList});
             });
 
-            registerFeatureCreatedListener(featureId => {
+            api.registerFeatureCreatedListener(featureId => {
                 console.log("new feature id" + featureId);
                 // stupid force redraw
                 thisComponent.setState(thisComponent.state);
@@ -401,14 +361,16 @@ function App() {
 
     const messageGet = async (t) => {
 	    t.preventDefault();
-        siteContract.then((sc) => {
+	    /*
+        api.siteContract.then((sc) => {
             sc.methods.getTestMessage().call().then((tm) => {
                 setTest(tm);
             });
         });
+	*/
     };
 
-    userAccount.then ((ua) => {
+    api.userAccount.then ((ua) => {
         setAddr(ua);
     });
 

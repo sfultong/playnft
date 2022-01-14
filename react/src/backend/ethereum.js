@@ -8,10 +8,6 @@ import detectEthereumProvider from '@metamask/detect-provider';
 const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
 const apiHost = process.env.REACT_APP_API_HOST;
 
-const installMetamask = 0;
-const loginMetamask = 1;
-const activeMetamask = 2;
-
 // --- section for simple promises that are initialized once, and then never changed --------------------
 const web3 = new Promise ((resolve, reject) => {
     detectEthereumProvider().then((provider) => {
@@ -345,6 +341,92 @@ const controlStartArtWithFeature = function (featureEndTime, imageData) {
     });
 };
 
+const makeWeb3LoginControls = function () {
+	const installMetamask = 0;
+	const loginMetamask = 1;
+	const activeMetamask = 2;
+
+	var state = installMetamask;
+
+	const login = function (successCallback) {
+		detectEthereumProvider().then(provider => {
+		    provider.request({ method: 'eth_requestAccounts' })
+			.then(_ => { state = activeMetamask; successCallback(); })
+			.catch((error) => {
+			});
+		});
+	};
+
+	const handleClick = function (successCallback) {
+		if (state === installMetamask) {
+			window.open("https://metamask.io/", "_blank");
+		} else if (state === loginMetamask) {
+			login(successCallback);
+		} else {
+		    // shouldn't be possible
+		    alert("handleClick: shouldn't be here");
+		}
+	};
+
+	const getDisplay = function () {
+		return state === installMetamask ? "Install Metamask"
+            : state === loginMetamask ? "Login to Metamask"
+            : "This message should be hidden";
+	};
+
+	const initComponent = function (successCallback) {
+		web3.then(_ => { state = loginMetamask; successCallback(); });
+	};
+
+	const shouldHide = function () {
+		return state === activeMetamask;
+	};
+
+	return {login: login, handleClick: handleClick, getDisplay: getDisplay, initComponent: initComponent
+		, shouldHide: shouldHide };
+};
+
+const makeAdminControls = function () {
+
+	const initComponent = function (setArtists) {
+		siteContract.then((sc) => {
+		    sc.methods.getNumArtist().call().then(na => setArtists(na));
+		});
+	};
+
+	const handleSubmit = function (address, callback) {
+		addArtist(address).then(receipt => callback(receipt));
+	};
+
+	return {initComponent: initComponent, handleSubmit: handleSubmit };
+};
+
+const makeArtistControls = function () {
+	
+	const initComponent = function (callback) {
+		userAccount.then((account) => {
+		    getArtist(account).then((artist) => {
+			callback({artistName: artist[0], artistDescription: artist[1]});
+		    });
+		});
+	};
+
+	const profileSubmit = function (artistName, artistDescription, callback) {
+		userAccount.then((account) => {
+		    modifyArtistProfile(artistName, artistDescription).then((result) => {
+			    callback(result);
+		    });
+		});
+	};
+
+	return { initComponent: initComponent, profileSubmit: profileSubmit };
+};
+
+const makeArtListingControls = function () {
+
+	//const submitBid = function (
+};
+
 // returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
 const getArtDisplay = function (i) { // i is the artId
     return new Promise ((resolve, reject) => {
@@ -401,3 +483,18 @@ const registerFeatureCreatedListener = function (callback) {
     });
 };
 
+export const api = {
+	userAccount: userAccount,
+	getNumArt: getNumArt,
+	makeBid: makeBid,
+	finishArt: finishArt,
+	signFeatureImage: signFeatureImage,
+	controlCompleteFeature: controlCompleteFeature,
+	controlStartArtWithFeature: controlStartArtWithFeature,
+	makeWeb3LoginControls: makeWeb3LoginControls,
+	makeAdminControls: makeAdminControls,
+	makeArtistControls: makeArtistControls,
+	getArtDisplay: getArtDisplay,
+	registerArtCreatedListener: registerArtCreatedListener,
+	registerFeatureCreatedListener: registerFeatureCreatedListener,
+};
