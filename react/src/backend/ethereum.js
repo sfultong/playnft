@@ -427,7 +427,20 @@ const makeArtListingControls = function () {
 	//const submitBid = function (
 };
 
-// returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
+const getArtList = function () {
+	return new Promise ((resolve, reject) => {
+		getNumArt().then((na) => {
+		    var artP = [];
+		    for (var i = 1; i <= 10 && na - i >= 0; i++) {
+			var artId = na - i;
+			artP.push(getArtDisplay(artId));
+		    }
+		    Promise.all(artP).then(l => resolve(l));
+		});
+	});
+};
+
+// returns {artistName, imgUrl, timeText, bidAmount, featureRequest, makeBid, completeFeature}
 const getArtDisplay = function (i) { // i is the artId
     return new Promise ((resolve, reject) => {
         getArt(i).then((art) => {
@@ -436,8 +449,15 @@ const getArtDisplay = function (i) { // i is the artId
                 getDisplayFeature(i).then((fid) => {
                     const endTimeCallback = (timeText, bidAmount, featureRequest) => {
                         const imgUrl = apiHost + "/" + fid + ".png";
+			const completeFeature = function (comp, endTime, img) {
+				return controlCompleteFeature(i, currentFeatureId, comp, endTime, img);
+			};
                         resolve({artistName: artist[0], imgUrl: imgUrl, timeText: timeText
-                                 , bidAmount: bidAmount, featureRequest: featureRequest, artId:i, featureId:currentFeatureId });
+                                 , bidAmount: bidAmount, featureRequest: featureRequest
+				, makeBid: function (req, amount) { return makeBid(i, req, amount); }
+				, completeFeature: completeFeature
+
+			});
                     };
 
                     if (art[1]) {
@@ -484,6 +504,7 @@ const registerFeatureCreatedListener = function (callback) {
 };
 
 export const api = {
+	getArtList: getArtList,
 	userAccount: userAccount,
 	getNumArt: getNumArt,
 	makeBid: makeBid,

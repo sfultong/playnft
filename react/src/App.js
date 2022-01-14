@@ -228,21 +228,15 @@ class ArtListing extends React.Component {
         if (myBid * 1 <= this.state.bidAmount * 1) {
             alert("you must make a higher bid");
         } else {
-            api.makeBid(this.props.artId, myRequest, myBid).then((receipt) => {
+            this.props.artData.makeBid(myRequest, myBid).then((receipt) => {
                 alert("You are now the highest bidder!");
-                thisComponent.setState({featureRequest:"Feature request: " + myRequest, bidAmount:"Bid amount: " + myBid});
+		    // redraw?
             });
         }
     }
 
-    componentDidMount() {
-        api.getArtDisplay(this.props.artId).then((art) => {this.setState(art);});
-    }
-
     completeFeature () {
-        const artId = this.props.artId;
         const thisFile = this.state.file;
-        const featureId = this.state.featureId;
         const completeArtwork = this.state.completeArtwork;
         const featureEndTime = this.state.featureEndTime;
 
@@ -250,7 +244,8 @@ class ArtListing extends React.Component {
         reader.readAsDataURL(thisFile);
         reader.onloadend = function () {
             const imageData = reader.result;
-            api.controlCompleteFeature(artId, featureId, completeArtwork, featureEndTime, imageData).then(receipt => {
+
+            this.props.artData.completeFeature(completeArtwork, featureEndTime, imageData).then(receipt => {
                 //TODO choose correct message
                 alert("art has been finished or bidding for next feature has started");
             }, err => {
@@ -263,13 +258,13 @@ class ArtListing extends React.Component {
     render () {
         return (
                 <div className="artListing">
-                <h3>{this.state.artistName}</h3>
-                <img src={this.state.imgUrl}/>
+                <h3>{this.props.artData.artistName}</h3>
+                <img src={this.props.artData.imgUrl}/>
                 <div className="listingBid">
-                    <div>{this.state.bidAmount}</div>
-                    <div>{this.state.featureRequest}</div>
+                    <div>{this.props.artData.bidAmount}</div>
+                    <div>{this.props.artData.featureRequest}</div>
                 </div>
-                <p className="listingFeatureEnd">{this.state.timeText}</p>
+                <p className="listingFeatureEnd">{this.props.artData.timeText}</p>
                 <div className="listingMakeBid">
                     <p>Request a feature</p>
                     <form action="" method="post" encType="multipart/form-data">
@@ -309,41 +304,27 @@ class ArtDisplay extends React.Component {
         super (props);
 
         this.state = {
-            artIds: []
+            artList: []
         };
     }
 
     componentDidMount() {
         const thisComponent = this;
-        api.getNumArt().then((na) => {
-            var artIds = [];
-            for (var i = 1; i <= 10 && na - i >= 0; i++) {
-                var artId = na - i;
-                artIds.push(artId);
-            }
-            thisComponent.setState({artIds:artIds});
+
+	    api.getArtList().then(al => thisComponent.setState({artList:al}));
 
             // listen for new art to display
-            api.registerArtCreatedListener(artId => {
-                console.log("new art id " + artId);
-                var newList = thisComponent.state.artIds;
-                newList.unshift(artId);
-                thisComponent.setState({artIds: newList});
+            api.registerFeatureCreatedListener(featureId => {
+		    api.getArtList().then(al => thisComponent.setState({artList:al}));
             });
 
-            api.registerFeatureCreatedListener(featureId => {
-                console.log("new feature id" + featureId);
-                // stupid force redraw
-                thisComponent.setState(thisComponent.state);
-            });
             //TODO add NewBid event
-        });
     }
 
     render () {
-        const list = this.state.artIds.map((id) => {
+        const list = this.state.artList.map(s => {
             return (
-                    <ArtListing artId={id}/>
+                    <ArtListing artData={s}/>
             );
         });
         return (
