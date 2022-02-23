@@ -10,6 +10,7 @@ use solana_program::{
     clock::Clock,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use std::mem;
 
 use crate::instruction::{PlaynftInstruction, PlayNFTData, ArtistVal, ArtistProfile, Feature, Art, Bid};
 use crate::error::PlaynftError;
@@ -115,7 +116,7 @@ impl Processor {
     ) -> ProgramResult {
         match accounts {
             [admin_account, playnft_account] => {
-                let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow())?;
+                let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow()).unwrap_or_default();
 
                 // validate account addresses
                 let test_playnft_address = Self::gen_playnft_address(admin_account.key, program_id)?;
@@ -141,7 +142,7 @@ impl Processor {
         let admin = next_account_info(account_info_iter)?;
         let playnft_account = next_account_info(account_info_iter)?;
         let artist_storage = next_account_info(account_info_iter)?;
-        let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow())?;
+        let mut playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow()).unwrap_or_default();
 
         // validate account addresses
         let test_playnft_address = Self::gen_playnft_address(admin.key, program_id)?;
@@ -152,7 +153,6 @@ impl Processor {
         if &test_artist_address != artist_storage.key {
             return Err(ProgramError::InvalidAccountData);
         }
-
 
         playnft_data.num_artists += 1;
         playnft_data.serialize(&mut &mut playnft_account.data.borrow_mut()[..])?;
@@ -171,7 +171,7 @@ impl Processor {
     ) -> ProgramResult {
         match accounts {
             [artist_account, profile_account] => {
-                let mut profile = ArtistProfile::try_from_slice(&profile_account.data.borrow())?;
+                let mut profile = ArtistProfile::try_from_slice(&profile_account.data.borrow()).unwrap_or_default();
 
                 // validate account addresses
                 let test_profile_address = Self::gen_profile_address(artist_account.key, program_id)?;
@@ -192,14 +192,11 @@ impl Processor {
     fn start_art(
         accounts: &[AccountInfo],
         program_id: &Pubkey,
-        end_time: i64,
+        end_time: u64,
     ) -> ProgramResult {
         match accounts {
             [artist_account, artist_profile_account, art_account, feature_account_a, feature_account_b] => {
                 let mut artist_profile_data = ArtistProfile::try_from_slice(&artist_profile_account.data.borrow())?;
-                let mut art_data = Art::try_from_slice(&art_account.data.borrow())?;
-                let mut first_feature_data = Feature::try_from_slice(&feature_account_a.data.borrow())?;
-                let mut second_feature_data = Feature::try_from_slice(&feature_account_b.data.borrow())?;
                 let art_id = artist_profile_data.num_art;
                 
                 // validate account addresses
@@ -221,16 +218,15 @@ impl Processor {
                 }
                 
 
-                let now = (Clock::get()?).unix_timestamp;
-                first_feature_data.start_time = now;
-                first_feature_data.end_time = now;
+                let now = (Clock::get()?).unix_timestamp as u64;
+                let first_feature_data = Feature { start_time: now, end_time: now, num_bids: 0 };
                 first_feature_data.serialize(&mut &mut feature_account_a.data.borrow_mut()[..])?;
 
-                second_feature_data.start_time = now;
-                second_feature_data.end_time = end_time;
+
+                let second_feature_data = Feature { start_time: now, end_time: end_time, num_bids: 0 };
                 second_feature_data.serialize(&mut &mut feature_account_b.data.borrow_mut()[..])?;
 
-                art_data.num_features = 2;
+                let art_data = Art { finished: 0, num_features: 2};
                 art_data.serialize(&mut &mut art_account.data.borrow_mut()[..])?;
 
                 artist_profile_data.num_art += 1;
@@ -252,7 +248,6 @@ impl Processor {
             [bidder_account, playnft_account, feature_account, new_bid_account, other_accounts @ ..] => {
                 let playnft_data = PlayNFTData::try_from_slice(&playnft_account.data.borrow())?;
                 let mut feature_data = Feature::try_from_slice(&feature_account.data.borrow())?;
-                let mut new_bid = Bid::try_from_slice(&new_bid_account.data.borrow())?;
 
                 //TODO validate feature account?
                 // validate new bid account
@@ -288,7 +283,7 @@ impl Processor {
                     }
                 }
 
-                let now = (Clock::get()?).unix_timestamp;
+                let now = (Clock::get()?).unix_timestamp as u64;
                 if now > feature_data.end_time {
                     return Err(PlaynftError::AuctionEnded.into());
                 }
@@ -296,9 +291,7 @@ impl Processor {
                 **bidder_account.lamports.borrow_mut() -= amount;
                 **new_bid_account.lamports.borrow_mut() += amount;
 
-                new_bid.address = *bidder_account.key;
-                new_bid.amount = amount;
-                new_bid.request = request;
+                let new_bid = Bid { address: *bidder_account.key, amount: amount, request: request };
                 new_bid.serialize(&mut &mut new_bid_account.data.borrow_mut()[..])?;
 
                 feature_data.num_bids += 1;
@@ -390,7 +383,7 @@ impl Processor {
                 }
 
                 // if this is the latest feature on unfinished art, cannot resolve bid
-                if feature_id >= art_data.num_features - 1 && ! art_data.finished {
+                if feature_id >= art_data.num_features - 1 && ! art_data.get_finished() {
                     return Err(PlaynftError::FeatureStillRunning.into());
                 }
 
@@ -418,12 +411,11 @@ impl Processor {
         accounts: &[AccountInfo],
         program_id: &Pubkey,
         art_id: u16,
-        end_time: i64,
+        end_time: u64,
     ) -> ProgramResult {
         match accounts {
             [artist_account, art_account, feature_account] => {
                 let mut art_data = Art::try_from_slice(&art_account.data.borrow())?;
-                let mut new_feature_data = Feature::try_from_slice(&feature_account.data.borrow())?;
 
                 // validate account addresses
                 let test_art_address = Self::gen_art_address(art_id, artist_account.key, program_id)?;
@@ -435,9 +427,8 @@ impl Processor {
                     return Err(ProgramError::InvalidAccountData);
                 }
 
-                let now = (Clock::get()?).unix_timestamp;
-                new_feature_data.start_time = now;
-                new_feature_data.end_time = end_time;
+                let now = (Clock::get()?).unix_timestamp as u64;
+                let new_feature_data = Feature { start_time: now, end_time: end_time, num_bids: 0 };
                 new_feature_data.serialize(&mut &mut feature_account.data.borrow_mut()[..])?;
 
                 art_data.num_features += 1;
@@ -465,7 +456,7 @@ impl Processor {
                     return Err(ProgramError::InvalidAccountData);
                 }
 
-                art_data.finished = true;
+                art_data.set_finished(true);
                 art_data.serialize(&mut &mut art_account.data.borrow_mut()[..])?;
 
                 Ok(())

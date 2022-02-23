@@ -2,7 +2,10 @@ import React, { useState } from "react";
 import logo from './logo.svg';
 import './App.css';
 
-import { api } from './backend/ethereum';
+//import { api } from './backend/ethereum';
+import { api_ } from './backend/solana';
+
+const api = api_.makeAPI(); // backend.makeAPI();
 
 class MetaMaskButton extends React.Component {
     constructor(props) {
@@ -51,7 +54,12 @@ class AdminInterface extends React.Component {
     }
 
     componentDidMount() {
-	    this.controls.initComponent(na => this.setState({numArtists: na}));
+	    const thisComponent = this;
+	    this.controls.initComponent(na => {
+		    api.userAccount().then ((ua) => {
+			    thisComponent.setState({numArtists: na, myAddress: ua});
+		    });
+	    });
     }
 
     changeHandler (v) {
@@ -78,6 +86,9 @@ class AdminInterface extends React.Component {
                     Submit
                     </button>
                 </div>
+		<div>
+		My address: {this.state.myAddress}
+		</div>
                 <div>
                 Number of artists is currently: {this.state.numArtists}
                 </div>
@@ -338,7 +349,6 @@ class ArtDisplay extends React.Component {
 
 function App() {
     const [getTest, setTest] = useState("uninitialized dummy string");
-    const [getAddr, setAddr] = useState("no address loaded");
 
     const messageGet = async (t) => {
 	    t.preventDefault();
@@ -351,9 +361,6 @@ function App() {
 	*/
     };
 
-    api.userAccount.then ((ua) => {
-        setAddr(ua);
-    });
 
     return (
         <div className="main">
@@ -362,11 +369,9 @@ function App() {
             </div>
             <div className="card">
                 <MetaMaskButton />
-                <div>{getAddr}</div>
                 <button className="button" onClick={messageGet} type="button">
                 Get message from Rinkeby contract
                 </button>
-                {getTest}
                 <AdminInterface />
                 <ArtistInterface />
                 <ArtDisplay />

@@ -1,11 +1,12 @@
 use std::convert::TryInto;
+use std::default::Default;
 use solana_program::{ program_error::ProgramError, pubkey::Pubkey};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::error::PlaynftError::InvalidInstruction;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(Default, BorshSerialize, BorshDeserialize, Debug)]
 pub struct PlayNFTData {
     pub num_artists: u32,
     pub fee: u64,
@@ -23,17 +24,17 @@ pub struct ArtistProfile {
     pub num_art: u16,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(Default, BorshSerialize, BorshDeserialize, Debug)]
 pub struct Feature {
-    pub start_time: i64,
-    pub end_time: i64,
+    pub start_time: u64,
+    pub end_time: u64,
     pub num_bids: u16,
     //pub accepted: bool, // do we need this? maybe an enum on Art would be better to indicate state
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(Default, BorshSerialize, BorshDeserialize, Debug)]
 pub struct Art {
-    pub finished: bool,
+    pub finished: u8,
     pub num_features: u16,
 }
 
@@ -42,6 +43,22 @@ pub struct Bid {
     pub address: Pubkey,
     pub amount: u64, // probably unnecessary, actually...
     pub request: [u8; 128],
+}
+
+impl Art {
+    pub fn get_finished (&self) -> bool {
+        self.finished != 0
+    }
+
+    pub fn set_finished (&mut self, v : bool) {
+        self.finished = if v {1} else {0};
+    }
+}
+
+impl Default for ArtistProfile {
+    fn default() -> Self {
+        ArtistProfile { name: [0; 64], description: [0; 512], num_art: 0 }
+    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -67,7 +84,7 @@ pub enum PlaynftInstruction {
     /// 3. `[writable]` first feature, which should be completed
     /// 4. `[writable]` second feature, which should be biddable
     StartArt {
-        end_time: i64,
+        end_time: u64,
     },
 
     ///
@@ -114,7 +131,7 @@ pub enum PlaynftInstruction {
     /// 2. `[writable]` new feature
     NextFeature {
         art_id: u16,
-        end_time: i64,
+        end_time: u64,
     },
     
     ///

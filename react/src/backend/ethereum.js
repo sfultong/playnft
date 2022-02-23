@@ -506,11 +506,6 @@ const registerFeatureCreatedListener = function (callback) {
 export const api = {
 	getArtList: getArtList,
 	userAccount: userAccount,
-	getNumArt: getNumArt,
-	makeBid: makeBid,
-	finishArt: finishArt,
-	signFeatureImage: signFeatureImage,
-	controlCompleteFeature: controlCompleteFeature,
 	controlStartArtWithFeature: controlStartArtWithFeature,
 	makeWeb3LoginControls: makeWeb3LoginControls,
 	makeAdminControls: makeAdminControls,

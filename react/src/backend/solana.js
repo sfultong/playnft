@@ -1,3 +1,4 @@
+/*
 import {
   Connection,
   PublicKey,
@@ -8,23 +9,22 @@ import {
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
+*/
+import * as solana from '@solana/web3.js';
 import * as borsh from 'borsh';
-import { Keccak } from 'sha3';
+import * as sha3 from 'sha3';
 import axios from 'axios';
+/*
+const solana = require('@solana/web3.js');
+const borsh = require('borsh');
+const sha3 = require('sha3');
+const axios = require('axios');
+*/
+
+const apiHost = process.env.REACT_APP_API_HOST;
 
 const TE = new TextEncoder();
 const TD = new TextDecoder();
-
-const provider = new Promise ((resolve, reject) => {
-  if ("solana" in window) {
-    const provider = window.solana;
-    if (provider.isPhantom) {
-      resolve(provider);
-    } else {
-          window.open("https://phantom.app/", "_blank");
-    }
-  }
-});
 
 // PlayNFT instructions
 class AddArtist {
@@ -61,8 +61,14 @@ class ModifyArtistProfile {
 	constructor(data) {
 		if (data) {
 			if (typeof(data.name) === 'string') {
-				this.name = TE.encode(data.name);
-				this.description = TE.encode(data.description);
+				const tempName = TE.encode(data.name);
+				const tempDesc = TE.encode(data.description);
+				for (var i = 0; i < tempName.length; i++) {
+					this.name[i] = tempName[i];
+				}
+				for (var i = 0; i < tempDesc.length; i++) {
+					this.description[i] = tempDesc[i];
+				}
 			}
 		}
 	}
@@ -75,7 +81,10 @@ class MakeBid {
 		if (data) {
 			if (typeof(data.request) === 'string') {
 				this.amount = data.amount;
-				this.request = TE.encode(data.request);
+				const tempRequest = TE.encode(data.request);
+				for (var i = 0; i < tempRequest.length; i++) {
+					this.request[i] = tempRequest[i];
+				}
 			}
 		}
 	}
@@ -152,7 +161,9 @@ class PubkeyDTO {
 
         constructor(data) {
                 if (data) {
-                        if (data.toBytes) {
+			if (typeof data === 'string') {
+				this.bytes = (new solana.PublicKey(data)).toBytes();
+			} else if (data.toBytes) {
                                 this.bytes = data.toBytes();
                         } else if (data.bytes) {
                                 this.bytes = data.bytes;
@@ -161,17 +172,19 @@ class PubkeyDTO {
         }
 
         toPubkey() {
-                return new PublicKey(this.bytes);
+                return new solana.PublicKey(this.bytes);
         }
 }
 
 // on-chain structures
 class PlayNFTData {
         numArtists = 0;
+	fee = 0;
 
         constructor(data) {
                 if (data) {
                         this.numArtists = data.numArtists;
+			this.fee = data.fee;
                 }
         }
 }
@@ -192,17 +205,42 @@ class ArtistProfile {
 	constructor(data) {
 		if (data) {
 			if (typeof(data.name) === 'string') {
-				this.name = TE.encode(data.name);
-				this.description = TE.encode(data.description);
+				const tempName = TE.encode(data.name);
+				const tempDesc = TE.encode(data.description);
+				for (var i = 0; i < tempName.length; i++) {
+					this.name[i] = tempName[i];
+				}
+				for (var i = 0; i < tempDesc.length; i++) {
+					this.description[i] = tempDesc[i];
+				}
+			} else if (data.name.byteLength) {
+				for (var i = 0; i < data.name.length; i++) {
+					this.name[i] = data.name[i];
+				}
+				for (var i = 0; i < data.description.length; i++) {
+					this.description[i] = data.description[i];
+				}
 			}
 		}
 	}
 
 	getName() {
-		return TD.decode(this.name);
+		var subString = this.name;
+		const zeroIndex = this.name.findIndex(x => ! x);
+		if (zeroIndex !== -1) {
+			subString = this.name.subarray(0, zeroIndex);
+		}
+
+		return TD.decode(subString);
 	}
 	getDescription() {
-		return TD.decode(this.description);
+		var subString = this.description;
+		const zeroIndex = this.description.findIndex(x => ! x);
+		if (zeroIndex !== -1) {
+			subString = this.description.subarray(0, zeroIndex);
+		}
+
+		return TD.decode(subString);
 	}
 }
 class Feature {
@@ -233,7 +271,10 @@ class Bid {
 		if (data) {
 			this.address = data.address;
 			this.amount = data.amount;
-			this.request = TE.encode(data.request);
+			const tempRequest = TE.encode(data.request);
+			for (var i = 0; i < tempRequest.length; i++) {
+				this.request[i] = tempRequest[i];
+			}
 		}
 	}
 
@@ -244,18 +285,18 @@ class Bid {
 
 const PlayNFTSchema = new Map([
         [PubkeyDTO, {kind: 'struct', fields: [['bytes', [32]]]}],
-        [PlayNFTData, {kind: 'struct', fields: [['numArtists', 'u32']]}],
+        [PlayNFTData, {kind: 'struct', fields: [['numArtists', 'u32'], ['fee','u64']]}],
         [ArtistVal, {kind: 'struct', fields: [['address', PubkeyDTO]]}],
 	[ArtistProfile, {kind: 'struct', fields: [['name', [64]], ['description', [512]], ['numArt', 'u16']]}],
-	[Feature, {kind: 'struct', fields: [['startTime', 'i64'], ['endTime', 'i64'], ['numBids', 'u16']]}],
-	[Art, {kind: 'struct', fields: [['finished', 'bool']]}],
+	[Feature, {kind: 'struct', fields: [['startTime', 'u64'], ['endTime', 'u64'], ['numBids', 'u16']]}],
+	[Art, {kind: 'struct', fields: [['finished', 'u8']]}],
 	[Bid, {kind: 'struct', fields: [['address', PubkeyDTO], ['amount', 'u64'], ['request', [128]]]}],
         [AddArtist, {kind: 'struct', fields: [['address', PubkeyDTO]]}],
-        [StartArt, {kind: 'struct', fields: [['endTime','i64']]}],
+        [StartArt, {kind: 'struct', fields: [['endTime','u64']]}],
 	[SetFee, {kind: 'struct', fields: [['fee','u64']]}],
 	[ModifyArtistProfile, {kind: 'struct', fields: [['name', [64]], ['description', [512]]]}],
 	[MakeBid, {kind: 'struct', fields: [['amount', 'u64'], ['request', [128]]]}],
-	[NextFeature, {kind: 'struct', fields: [['artId', 'u16'], ['endTime', 'i64']]}],
+	[NextFeature, {kind: 'struct', fields: [['artId', 'u16'], ['endTime', 'u64']]}],
 	[FinishArt, {kind: 'struct', fields: [['artId', 'u16']]}],
 	[ResolveBid, {kind: 'struct', fields: [['artId', 'u16'], ['featureId', 'u16'], ['bidId', 'u16']]}],
         [PlayNFTInstruction, {kind: 'enum', field: 'iType', values: [
@@ -264,12 +305,13 @@ const PlayNFTSchema = new Map([
 		['setFee', SetFee],
 		['modifyArtistProfile', ModifyArtistProfile],
 		['makeBid', MakeBid],
-		['nextFeature', Nextfeature],
+		['nextFeature', NextFeature],
 		['finishArt', FinishArt],
 		['resolveBid', ResolveBid],
         ]}],
 ]);
 
+// TODO could remove
 const PLAYNFT_DATA_SIZE = borsh.serialize(PlayNFTSchema, new PlayNFTData()).length;
 const ARTISTVAL_DATA_SIZE = borsh.serialize(PlayNFTSchema, new ArtistVal()).length;
 const ARTIST_PROFILE_DATA_SIZE = borsh.serialize(PlayNFTSchema, new ArtistProfile()).length;
@@ -279,16 +321,63 @@ const BID_DATA_SIZE = borsh.serialize(PlayNFTSchema, new Bid()).length;
 
 const PLAYNFT_SEED = "playnft";
 const url = "http://localhost:8899"
-const connection = new Connection(url, 'confirmed');
+const connection = new solana.Connection(url, 'confirmed');
 
-const PROGRAM_ID_PUBKEY = new PublicKey("78tcnH5Hyqc1Tgm3tyNS14jYnZ6bTcjPCLzgT4R32gka");
+const PROGRAM_ID_PUBKEY = new solana.PublicKey("7LYdZDwexbkgEF49c7HxNjpdpGwEKFuxV3eRdqrm23by");
+const ADMIN_PUBKEY = new solana.PublicKey("Vgf5sNqv6T4Heqb1xXNLPKpaWqvnDHvADkpDbq7eHUo");
+var test_admin_address; 
+var test_user_keys;
+
+const pProvider = new Promise ((resolve, reject) => {
+	try {
+		window.onload = _ => {
+		  if ("solana" in window) {
+		    const provider = window.solana;
+		    if (provider.isPhantom) {
+		      resolve(provider);
+		    } else {
+			  window.open("https://phantom.app/", "_blank");
+		    }
+		  }
+		};
+	} catch (e) {
+	}
+});
+const dProvider = new Promise ((resolve, reject) => {
+	resolve({
+		signAndSendTransaction: function (transaction, opts) {
+			return new Promise ((resolve, reject) => {
+				connection.sendTransaction(transaction, [test_user_keys], opts).then(r => {
+					resolve({signature: r});
+				});
+			});
+		},
+		connect: function () {
+			return new Promise ((resolve, reject) => {
+				connection.requestAirdrop(test_user_keys.publicKey, solana.LAMPORTS_PER_SOL * 10)
+					.then(s => connection.confirmTransaction(s).then(_ =>
+						resolve({publicKey: test_user_keys.publicKey})));
+			});
+
+		}
+	});
+});
+const getProvider = function () {
+
+	if (test_admin_address) {
+		return dProvider;
+	} else {
+		return pProvider;
+	}
+};
 
 const newTransaction = () => {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
+                userPubkey().then(uk => {
                         connection.getRecentBlockhash().then(r => {
                                 const opts = { recentBlockhash: r.blockhash, feePayer: uk};
-                                resolve(new Transaction(opts));
+				console.log("resolving newTransaction");
+                                resolve(new solana.Transaction(opts));
                         });
                 });
         });
@@ -296,12 +385,13 @@ const newTransaction = () => {
 
 const signSendConfirm = transaction => {
         return new Promise ((resolve, reject) => {
-                provider.then(p => {
+                getProvider().then(p => {
                         const opts = {
                           preflightCommitment: "processed"
                         }
                         p.signAndSendTransaction(transaction, opts).then(r => {
                                 connection.confirmTransaction(r.signature).then(_ => {
+					console.log("resolving signSendConfirm");
                                         resolve();
                                 });
                         });
@@ -309,29 +399,42 @@ const signSendConfirm = transaction => {
         });
 };
 
-const userPubkey = new Promise((resolve, reject) => {
-        provider.then(p => p.connect().then(resp => resolve(resp.publicKey)));
-});
+const userPubkey = function () {
+	return new Promise((resolve, reject) => {
+		getProvider().then(p => p.connect().then(resp => resolve(resp.publicKey)));
+	});
+}
 
-//TODO replace with hard-coded admin address
-const adminAddress = new Promise((resolve, reject) => {
-        userPubkey.then(pk => resolve(pk));
-});
+const adminAddress = function () {
+	return new Promise((resolve, reject) => {
+		if (test_admin_address) {
+			console.log("resolving adminAddress (test)");
+			resolve(test_admin_address);
+		} else {
+			console.log("resolving adminAddress");
+			resolve(ADMIN_PUBKEY);
+		}
+	});
+}
 
 // section for address generation by seed
-const getPnftAddress = new Promise((resolve, reject) => {
-        adminAddress.then(aa => {
-                PublicKey.createWithSeed(aa, PLAYNFT_SEED, PROGRAM_ID_PUBKEY).then(pntfa => {
-			resolve({publicKey: pntfa, seed: PLAYNFT_SEED, size: PLAYNFT_DATA_SIZE, type: PlayNFTData
-				, baseKey: aa});
+// TODO size unnecessary now, can remove
+const getPnftAddress = function () {
+	return new Promise((resolve, reject) => {
+		adminAddress().then(aa => {
+			solana.PublicKey.createWithSeed(aa, PLAYNFT_SEED, PROGRAM_ID_PUBKEY).then(pntfa => {
+				console.log("resolving getPnftAddress");
+				resolve({publicKey: pntfa, seed: PLAYNFT_SEED, size: PLAYNFT_DATA_SIZE
+					, type: PlayNFTData, baseKey: aa});
+			});
 		});
 	});
-});
+};
 const getArtistAddressAddress = function (artistId) {
         return new Promise ((resolve, reject) => {
-                adminAddress.then(aa => {
+                adminAddress().then(aa => {
                         const seed = "artists" + artistId;
-                        PublicKey.createWithSeed(aa, seed, PROGRAM_ID_PUBKEY)
+                        solana.PublicKey.createWithSeed(aa, seed, PROGRAM_ID_PUBKEY)
                         .then(aaa => resolve({publicKey: aaa, seed: seed, size: ARTISTVAL_DATA_SIZE, type: ArtistVal
 				, baseKey: aa}));
                 });
@@ -340,7 +443,7 @@ const getArtistAddressAddress = function (artistId) {
 const getArtistProfileAddress = function (artistKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "profile";
-		PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
+		solana.PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
 			.then(apa => resolve({publicKey: apa, seed: seed, size: ARTIST_PROFILE_DATA_SIZE
 				, type: ArtistProfile, baseKey: artistKey}));
 	});
@@ -348,14 +451,14 @@ const getArtistProfileAddress = function (artistKey) {
 const getArtAddress = function (art_id, artistKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "art" + art_id;
-		PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
-		.then(aa => resolve({publicKey: aa, seed: seed, size: ART_DATA_SIZE, type: Art, baseKey: artistkey}));
+		solana.PublicKey.createWithSeed(artistKey, seed, PROGRAM_ID_PUBKEY)
+		.then(aa => resolve({publicKey: aa, seed: seed, size: ART_DATA_SIZE, type: Art, baseKey: artistKey}));
 	});
 };
 const getFeatureAddress = function (feature_id, artKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "feature" + feature_id;
-		PublicKey.createWithSeed(artKey, seed, PROGRAM_ID_PUBKEY)
+		solana.PublicKey.createWithSeed(artKey, seed, PROGRAM_ID_PUBKEY)
 		.then(fa => resolve({publicKey: fa, seed: seed, size: FEATURE_DATA_SIZE, type: Feature
 			, baseKey: artKey}));
 	});
@@ -363,112 +466,80 @@ const getFeatureAddress = function (feature_id, artKey) {
 const getBidAddress = function (bid_id, featureKey) {
         return new Promise ((resolve, reject) => {
 		const seed = "bid" + bid_id;
-		PublicKey.createWithSeed(featureKey, seed, PROGRAM_ID_PUBKEY)
+		solana.PublicKey.createWithSeed(featureKey, seed, PROGRAM_ID_PUBKEY)
 		.then(ba => resolve({publicKey: ba, seed: seed, size: BID_DATA_SIZE, type: Bid, baseKey: featureKey}));
 	});
 };
 
 
 // also creates account, if it doesn't already exist (but you need to be admin!)
-const playNFTDataAddress = new Promise((resolve, reject) => {
-        adminAddress.then(aa => {
-                getPnftAddress.then(pntfa => {
-                        connection.getAccountInfo(pntfa, 'confirmed').then(ai => {
-                                if (! ai) {
-                                        console.log("initializing playNFT data");
-					newTransaction().then(t => {
-						createAccount(pntfa).then(ix => {
-							t.add(ix);
-							signSendConfirm(t).then(_ => resolve(pntfa));
+const playNFTDataAddress = function () {
+	return new Promise((resolve, reject) => {
+		adminAddress().then(aa => {
+			getPnftAddress().then(pntfa => {
+				connection.getAccountInfo(pntfa.publicKey, 'confirmed').then(ai => {
+					if (! ai) {
+						console.log("initializing playNFT data");
+						newTransaction().then(t => {
+							createAccount(pntfa).then(ix => {
+								t.add(ix);
+								signSendConfirm(t).then(_ => resolve(pntfa));
+							});
 						});
-					});
-
-					/*
-                                        connection.getMinimumBalanceForRentExemption(PLAYNFT_DATA_SIZE)
-                                                .then(lamSize => {
-                                                const createAccountIx = SystemProgram.createAccountWithSeed({
-                                                        space: PLAYNFT_DATA_SIZE,
-                                                        lamports: lamSize,
-                                                        fromPubkey: aa,
-                                                        basePubkey: aa,
-                                                        seed: PLAYNFT_SEED,
-                                                        newAccountPubkey: pntfa,
-                                                        programId: PROGRAM_ID_PUBKEY,
-                                                });
-                                                newTransaction().then(t => {
-                                                        t.add(createAccountIx);
-                                                        signSendConfirm(t).then(_ => resolve(pntfa));
-                                                });
-                                        });
-					*/
-                                } else {
-                                        resolve(pntfa);
-                                }
-                        });
-                });
-        });
-});
+					} else {
+						console.log("resolving playNFTDataAddress");
+						resolve(pntfa);
+					}
+				});
+			});
+		});
+	});
+};
 
 const createAccount = function (a) {
         return new Promise ((resolve, reject) => {
-		userPubkey.then(uk = {
+		userPubkey().then(uk => {
+			const accountSize = borsh.serialize(PlayNFTSchema, new a.type()).length;
 			connection.getMinimumBalanceForRentExemption(a.size).then(lamSize => 
-				resolve(SystemProgram.createAccountWithSeed({
-					space: a.size,
+				resolve(solana.SystemProgram.createAccountWithSeed({
+					space: accountSize,
 					lamports: lamSize,
 					fromPubkey: uk,
 					basePubkey: a.baseKey,
 					seed: a.seed,
 					newAccountPubkey: a.publicKey,
 					programId: PROGRAM_ID_PUBKEY,
-				}));
+				}))
 			);
 		});
-
 	});
 }
 
 const deserialize = function (a) {
         return new Promise ((resolve, reject) => {
 		connection.getAccountInfo(a.publicKey).then(accountInfo => {
-			resolve(borsh.deserialize(PlayNFTSchema, a.type, accountInfo.data));
+			if (accountInfo) {
+				console.log("resolving deserialize");
+				console.log(a.type);
+				console.log(accountInfo.data);
+				resolve(borsh.deserialize(PlayNFTSchema, a.type, accountInfo.data));
+			} else {
+				reject();
+			}
 		});
 	});
 };
 
-/*
-const getPlayNFTData = function () {
-        return new Promise ((resolve, reject) => {
-                playNFTDataAddress.then(pnfta => {
-                        connection.getAccountInfo(pnfta.publicKey).then(accountInfo => {
-                                resolve(borsh.deserialize(PlayNFTSchema, pntfa.type, accountInfo.data));
-                        });
-                });
-        });
-};
-const getArtistAddress = function (artistId) {
+const getArtistAddressById = function (artistId) {
         return new Promise ((resolve, reject) => {
                 getArtistAddressAddress(artistId).then(aaa => {
-                        connection.getAccountInfo(aaa.publicKey).then(accountInfo => {
-                                const aaVal = borsh.deserialize(PlayNFTSchema, ArtistVal, accountInfo.data);
-                                resolve(aaVal.address.toPubkey());
-                        });
+			deserialize(aaa).then(aa => resolve(aa.address.toPubkey()));
                 });
         });
 };
-const getArtistProfile = function (artistKey) {
-        return new Promise ((resolve, reject) => {
-		getArtistProfileAddress(artistKey).then(apa => {
-			connection.getAccountInfo(apa.publicKey).then(ai => {
-				resolve(borsh.deserialize(PlayNFTSchema, ArtistProfile, ai.data));
-			});
-		});
-	});
-};
-*/
 
 const playnftInstruction = function (i, keys) {
-	return new TransactionInstruction({
+	return new solana.TransactionInstruction({
 		programId: PROGRAM_ID_PUBKEY,
 		data: borsh.serialize(PlayNFTSchema, new PlayNFTInstruction(i)),
 		keys: keys
@@ -477,8 +548,8 @@ const playnftInstruction = function (i, keys) {
 
 const addArtist = function (artistAddress) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
-                        playNFTDataAddress.then(playNFTAddress => {
+                userPubkey().then(uk => {
+                        playNFTDataAddress().then(playNFTAddress => {
                                 deserialize(playNFTAddress).then(pnftData => {
                                         getArtistAddressAddress(pnftData.numArtists).then(aaa => {
 						newTransaction().then(t => {
@@ -498,41 +569,6 @@ const addArtist = function (artistAddress) {
                                                                 signSendConfirm(t).then(_ => resolve(aaa));
 							});
 						});
-						/*
-                                                connection.getMinimumBalanceForRentExemption(ARTISTVAL_DATA_SIZE)
-                                                .then(lamSize => {
-                                                        const createAccountIx = SystemProgram.createAccountWithSeed({
-                                                                space: ARTISTVAL_DATA_SIZE,
-                                                                lamports: lamSize,
-                                                                fromPubkey: uk,
-                                                                basePubkey: uk,
-                                                                seed: aaa.seed,
-                                                                newAccountPubkey: aaa.publicKey,
-                                                                programId: PROGRAM_ID_PUBKEY,
-                                                        });
-                                                        const instr = new PlayNFTInstruction(new AddArtist(
-                                                                artistAddress));
-                                                        const iData = borsh.serialize(PlayNFTSchema, instr);
-                                                        const pnftIx = new TransactionInstruction({
-                                                                programId: PROGRAM_ID_PUBKEY,
-                                                                data: iData,
-                                                                keys: [
-                                                                        {pubkey: uk, isSigner: true
-                                                                                , isWritable: false},
-                                                                        {pubkey: playNFTAddress, isSigner: false
-                                                                                , isWritable: true},
-                                                                        {pubkey: aaa.publicKey, isSigner: false
-                                                                                , isWritable: true},
-                                                                ],
-
-
-                                                        });
-                                                        newTransaction().then(t => {
-                                                                t.add(createAccountIx, pnftIx);
-                                                                signSendConfirm(t).then(_ => resolve(aaa));
-                                                        });
-                                                });
-						*/
                                         });
                                 });
                         });
@@ -542,20 +578,20 @@ const addArtist = function (artistAddress) {
 
 const modifyArtistProfile = function (name, description) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
+                userPubkey().then(uk => {
 			getArtistProfileAddress(uk).then(apa => {
 				connection.getAccountInfo(apa.publicKey).then(accountInfo => {
 					var ixs = [];
 					const sendTx = function () {
 						const iData = {name: name, description: description};
-						const instr = new PlayNFTInstruction(new ModifyArtistProfile(iData));
+						const instr = new ModifyArtistProfile(iData);
 						ixs.push(playnftInstruction(instr,
 							[
 								{pubkey: uk, isSigner: true, isWritable: false},
 								{pubkey: apa.publicKey, isSigner: false
 									, isWritable: true},
 							],
-						);
+						));
 						newTransaction().then(t => {
 							ixs.forEach(i => t.add(i));
 							signSendConfirm(t).then(_ => resolve());
@@ -566,22 +602,6 @@ const modifyArtistProfile = function (name, description) {
 							ixs.push(ix);
 							sendTx();
 						});
-
-						/*
-						connection.getMinimumBalanceForRentExemption(ARTIST_PROFILE_DATA_SIZE)
-							.then(lamSize => {
-							const createAccountIx = SystemProgram.createAccountWithSeed({
-								space: ARTIST_PROFILE_DATA_SIZE,
-								lamports: lamSize,
-								fromPubkey: uk,
-								basePubkey: uk,
-								seed: apa.seed,
-								newAccountPubkey: apa.publicKey,
-								programId: PROGRAM_ID_PUBKEY,
-							});
-							ixs.push(createAccountIx);
-						});
-						*/
 					} else {
 						sendTx();
 					}
@@ -593,17 +613,17 @@ const modifyArtistProfile = function (name, description) {
 
 const startArtWithFeature = function (endTime) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
+                userPubkey().then(uk => {
 			getArtistProfileAddress(uk).then(apa => {
 				deserialize(apa).then(ap => {
 					getArtAddress(ap.numArt, uk).then(aa => {
 						getFeatureAddress(0, aa.publicKey).then(faa => {
 							getFeatureAddress(1, aa.publicKey).then(fab => {
-								Promise.all(
+								Promise.all([
 									createAccount(aa),
 									createAccount(faa),
 									createAccount(fab),
-								).then(ixs => {
+								]).then(ixs => {
 									ixs.push(playnftInstruction(new StartArt(endTime),
 										[
 											{pubkey: uk, isSigner: true,
@@ -642,7 +662,7 @@ const startArtWithFeature = function (endTime) {
 
 const nextFeature = function (artId, endTime) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
+                userPubkey().then(uk => {
 			getArtAddress(artId, uk).then(aa => {
 				deserialize(aa).then(art => {
 					getFeatureAddress(art.numFeatures, aa).then(fa => {
@@ -670,11 +690,11 @@ const nextFeature = function (artId, endTime) {
 	});
 };
 
-const makeBid = function (artId, request, amount) {
+const makeBid = function (artistAddress, artId, request, amount) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
-                        playNFTDataAddress.then(playNFTAddress => {
-				getArtAddress(artId, uk).then(aa => {
+                userPubkey().then(uk => {
+                        playNFTDataAddress().then(playNFTAddress => {
+				getArtAddress(artId, artistAddress).then(aa => {
 					deserialize(aa).then(art => {
 						getFeatureAddress(art.numFeatures - 1, aa).then(fa => {
 							deserialize(fa).then(feature => {
@@ -733,7 +753,7 @@ const makeBid = function (artId, request, amount) {
 
 const finishArt = function (artId) {
         return new Promise ((resolve, reject) => {
-                userPubkey.then(uk => {
+                userPubkey().then(uk => {
 			getArtAddress(artId, uk).then(aa => {
 				newTransaction().then(t => {
 					t.add(playnftInstruction(
@@ -760,12 +780,12 @@ const signFeatureImage = function (featureId, imageHash) {
 
 const controlCompleteFeature = function (artId, featureId, completeArtwork, featureEndTime, imageData) {
         return new Promise ((resolve, reject) => {
-		const hash = new Keccak(256);
+		const hash = new sha3.Keccak(256);
 		hash.update(imageData);
 		const imageHash = hash.digest('hex');
 
-                userPubkey.then(uk => {
-			signfeatureImage(featureId, imageHash).then(signResult => {
+                userPubkey().then(uk => {
+			signFeatureImage(featureId, imageHash).then(signResult => {
 				const formData = new FormData();
 				formData.append("imageData", imageData);
 				formData.append("signedData", signResult.message);
@@ -809,6 +829,7 @@ const controlStartArtWithFeature = function (featureEndTime, imageData) {
 	});
 };
 
+//const makeBid = function (artistAddress, artId, request, amount) {
 const getArtDisplay = function (artistAddress, artId) {
         return new Promise ((resolve, reject) => {
 		getArtistProfileAddress(artistAddress).then(apa => {
@@ -818,20 +839,33 @@ const getArtDisplay = function (artistAddress, artId) {
 						const displayFeature = art.finished ? art.numFeatures - 1
 							: art.numfeatures - 2;
 						const imgUrl = apiHost + "/" + artistAddress + "/" + artId + "_" 
-							+ displayfeature;
+							+ displayFeature;
+						const makeBid_ = function (req, amount) {
+							return makeBid (artistAddress, artId, req, amount);
+						};
+						const completeFeat = function (comp, endTime, img) {
+							return controlCompleteFeature(artId, art.numFeatures - 1
+								, comp, endTime, img);
+						};
 
 						getFeatureAddress(displayFeature, aa).then(fa => {
 							deserialize(fa).then(feature => {
 								getBidAddress(feature.numBids - 1, fa).then(ba => {
 									deserialize(ba).then(bid => {
+										console.log("resolving getArtDisplay");
+
 										resolve({
 											artistName: ap.name,
-											imgUrl: imgurl,
+											imgUrl: imgUrl,
 											timeText: feature.endTime,
 											bidAmount: bid.amount,
 											featureRequest: bid.request,
+											makeBid: makeBid_,
+											completeFeature: completeFeat,
+											/*
 											artId: artId,
 											featureId: displayFeature,
+											*/
 										});
 									});
 								});
@@ -844,7 +878,171 @@ const getArtDisplay = function (artistAddress, artId) {
 	});
 };
 
-// const startFeature = function (artId, endTime) { // don't need this if we have nextFeature
-// // returns {artistName, imgUrl, timeText, bidAmount, featureRequest, artId, featureId}
-// const getArtDisplay = function (i) { // i is the artId
+const getArtList = function (artId) {
+	const getAllArt = function (artistId) {
+		return new Promise ((resolve, reject) => {
+			getArtistAddressById(artistId).then(aa => {
+				console.log("getAllArt got artist address");
+				getArtistProfileAddress(aa).then(apa => {
+					console.log("getAllArt got artist profile address");
+					console.log(apa);
+					connection.getAccountInfo(apa.publicKey).then(accountInfo => {
+						if (accountInfo) {
+							deserialize(apa).then(ap => {
+								var artP = [];
+								for (var i = 0; i < ap.numArt; i++) {
+									artP.push(getArtDisplay(aa, i));
+								}
+								console.log("getAllArt all promises assembled");
+								console.log(artP);
+								Promise.all(artP).then(al => {
+									resolve(al);
+									console.log("getAllArt resolved all promises");
+								});
+							});
+						} else {
+							resolve([]);
+						}
+					});
+				});
+			});
+		});
+	};
+	return new Promise ((resolve, reject) => {
+		playNFTDataAddress().then(playNFTAddress => {
+			console.log("getArtList got playNFTAddress");
+			deserialize(playNFTAddress).then(pnftData => {
+				console.log("getArtList got playNFT data");
+				var artistP = [];
+				for (var i = 0; i < pnftData.numArtists; i++) {
+					artistP.push(getAllArt(i));
+				}
+				console.log("getArtList got all art data");
+				Promise.all(artistP).then(aal => resolve(aal.flat()));
+			});
+		});
+	});
+};
 
+const makeWeb3LoginControls = function () {
+	const installState = 0;
+	const loginState = 1;
+	const activeState = 2;
+
+	var state = installState;
+
+	const login = function (successCallback) {
+		userPubkey().then(_ => successCallback());
+	};
+
+	const handleClick = function (successCallback) {
+		if (state === installState) {
+			window.open("https://phantom.app/", "_blank");
+		} else if (state === loginState) {
+			login(successCallback);
+		} else {
+			alert("web3Login-handleClick: shouldn't be here");
+		}
+	};
+
+	const getDisplay = function () {
+		return state === installState ? "Install Phantom"
+		: state === loginState ? "Login with Phantom"
+		: "This message should be hidden";
+	};
+
+	const initComponent = function (successCallback) {
+		successCallback();
+	}
+
+	const shouldHide = function () {
+		return state === activeState;
+	};
+
+	return {login: login, handleClick: handleClick, getDisplay: getDisplay, initComponent: initComponent
+                , shouldHide: shouldHide };
+
+};
+
+const makeAdminControls = function () {
+
+	const initComponent = function (setArtists) {
+		playNFTDataAddress().then(playNFTAddress => {
+			deserialize(playNFTAddress).then(pnftData => {
+				setArtists(pnftData.numArtists);
+			});
+		});
+	};
+
+	const handleSubmit = function (address, callback) {
+		addArtist(address).then(x => callback(x));
+	}
+
+	return {initComponent: initComponent, handleSubmit: handleSubmit };
+};
+
+const makeArtistControls = function () {
+	
+	const initComponent = function (callback) {
+                userPubkey().then(uk => {
+			console.log("mac: upk got");
+			getArtistProfileAddress(uk).then(apa => {
+				console.log("mac: apa got");
+				deserialize(apa).then(ap => {
+					callback({artistName: ap.getName(), artistDescription: ap.getDescription()});
+				}).catch(_ => {
+					console.log("artist controls: no artist profile");
+				});
+			});
+		});
+	};
+
+	const profileSubmit = function (artistName, artistDescription, callback) {
+		modifyArtistProfile(artistName, artistDescription).then(x => callback(x));
+	};
+
+	return { initComponent: initComponent, profileSubmit: profileSubmit };
+};
+
+const userAccount = function () {
+	return new Promise ((resolve, reject) => {
+		//userPubkey().then(upk => resolve(upk.toBase58()));
+		userPubkey().then(upk => {
+			console.log("user pubkey in useraccount:");
+			console.log(upk);
+			resolve(upk.toBase58());
+			console.log("user pubkey in useraccount finished");
+		});
+	});
+};
+
+//TODO
+const registerArtCreatedListener = function (callback) {};
+const registerFeatureCreatedListener = function (callback) {};
+
+const makeAPI = function (ta, tuk) {
+	//test_admin_address = new solana.PublicKey(ta);
+	test_admin_address = ta;
+	test_user_keys = tuk;
+
+	return {
+		addArtist: addArtist,
+		getArtList: getArtList,
+		userAccount: userAccount,
+		controlStartArtWithFeature: controlStartArtWithFeature,
+		makeWeb3LoginControls: makeWeb3LoginControls,
+		makeAdminControls: makeAdminControls,
+		makeArtistControls: makeArtistControls,
+		getArtDisplay: getArtDisplay,
+		registerArtCreatedListener: registerArtCreatedListener,
+		registerFeatureCreatedListener: registerFeatureCreatedListener,
+		getArtistAddressAddress: getArtistAddressAddress,
+	};
+};
+/*
+module.exports = {makeAPI:makeAPI, newKeys: function () { return new solana.Keypair(); }};
+console.log(module);
+*/
+export const api_ = {
+	makeAPI: makeAPI,
+};
